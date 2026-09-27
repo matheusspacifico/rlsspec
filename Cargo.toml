@@ -2,11 +2,23 @@
 name = "rlsspec"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.89"
 description = "Check Postgres Row Level Security against a spec of expected access"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/matheusspacifico/rlsspec"
+homepage = "https://github.com/matheusspacifico/rlsspec"
+documentation = "https://github.com/matheusspacifico/rlsspec#readme"
 keywords = ["postgres", "rls", "security", "testing", "cli"]
 categories = ["command-line-utilities", "database", "development-tools::testing"]
+include = [
+    "/src/**/*.rs",
+    "/src/**/*.snap",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+]
 
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }

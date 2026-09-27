@@ -99,7 +99,7 @@ $ rlsspec version
 
 ### Try the example
 
-[`examples/multitenant`](examples/multitenant) is a small project tracker with every identity × table ×
+[`examples/multitenant`](https://github.com/matheusspacifico/rlsspec/tree/main/examples/multitenant) is a small project tracker with every identity × table ×
 operation specified:
 
 ```console
@@ -109,7 +109,7 @@ $ export DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres
 $ rlsspec test
 ```
 
-[`examples/supabase-todo`](examples/supabase-todo) is the same on Supabase: shared todo lists, policies on
+[`examples/supabase-todo`](https://github.com/matheusspacifico/rlsspec/tree/main/examples/supabase-todo) is the same on Supabase: shared todo lists, policies on
 `auth.uid()`, the `supabase/postgres` image.
 
 ### Write your own spec
@@ -286,4 +286,4 @@ This software is provided "as is", without warranty of any kind; see the [licens
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+Licensed under either of [Apache License, Version 2.0](https://github.com/matheusspacifico/rlsspec/blob/main/LICENSE-APACHE) or [MIT license](https://github.com/matheusspacifico/rlsspec/blob/main/LICENSE-MIT) at your option.
