@@ -1,0 +1,5 @@
+---
+source: tests/cli.rs
+expression: out.stderr
+---
+error: refusing to connect to non-local host `db.example.com`; list it under `safety.allowed_hosts` or pass --allow-remote

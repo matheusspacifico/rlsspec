@@ -1,0 +1,17 @@
+---
+source: tests/cli.rs
+expression: out.stderr
+---
+error: undefined variable `tenant_b`
+  --> tests/fixtures/cli/invalid.yaml:17:23
+   |
+17 |       select: { rows: "tenant_id = ${tenant_b}" }
+   |                       ^
+
+error: unknown identity `bob`; declare it under `identities`
+  --> tests/fixtures/cli/invalid.yaml:18:5
+   |
+18 |     bob:
+   |     ^
+
+error: could not load tests/fixtures/cli/invalid.yaml (2 errors)
