@@ -1,0 +1,96 @@
+name: publish-docker
+
+on:
+  # release.yml calls this (dist's `./publish-docker` publish job) once the GitHub Release exists.
+  # A release created with GITHUB_TOKEN never triggers `on: release`, hence the call.
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  # Push the image of an existing release again.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/matheusspacifico/rlsspec
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - id: release
+        env:
+          PLAN: ${{ inputs.plan }}
+          TAG_INPUT: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="${TAG_INPUT:-$(jq -r .announcement_tag <<<"$PLAN")}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::not a release tag: $tag"
+            exit 1
+          fi
+          prerelease="$(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease)"
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          persist-credentials: false
+      # The image runs the released musl binaries, checked against the release's sha256.
+      - name: Fetch the release binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -D dl \
+            -p 'rlsspec-*-unknown-linux-musl.tar.xz' -p 'rlsspec-*-unknown-linux-musl.tar.xz.sha256'
+          (cd dl && sha256sum -c ./*.sha256)
+          for pair in amd64:x86_64 arm64:aarch64; do
+            arch="${pair%%:*}" triple="${pair#*:}-unknown-linux-musl"
+            mkdir -p "prebuilt/$arch"
+            tar xf "dl/rlsspec-$triple.tar.xz" -C "prebuilt/$arch" --strip-components=1 "rlsspec-$triple/rlsspec"
+          done
+      - uses: docker/setup-buildx-action@v3
+      - name: Smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: |
+            BINARY=prebuilt
+            VERSION=${{ steps.release.outputs.version }}
+          load: true
+          tags: rlsspec:smoke
+      - shell: bash
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: test "$(docker run --rm rlsspec:smoke version)" = "rlsspec $VERSION"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BINARY=prebuilt
+            VERSION=${{ steps.release.outputs.version }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.prerelease != 'true' && format('{0}:latest', env.IMAGE) || '' }}

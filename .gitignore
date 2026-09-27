@@ -23,3 +23,6 @@
 *.swp
 .DS_Store
 Thumbs.db
+
+# release binaries staged for the docker image
+/prebuilt/
