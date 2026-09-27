@@ -63,6 +63,19 @@ fn multitenant_example_is_fully_covered() {
     insta::assert_snapshot!(out.stdout);
 }
 
+#[test]
+fn multitenant_example_lints_clean() {
+    let db = example_db(&[]);
+    let out = db.rlsspec(&["lint", "-c", &format!("{EXAMPLE}/rlsspec.yaml")]);
+    assert_eq!(out.code, Some(0), "{}", out.stderr);
+    assert_eq!(out.stderr, "");
+    let skipped = "RLS007 skipped: needs PostgreSQL 15 or later (security_invoker)\n";
+    assert_eq!(
+        out.stdout.replace(skipped, ""),
+        "0 errors · 0 warnings · 0 info · 0 ignored\n"
+    );
+}
+
 fn scratch(test: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(test);
     let _ = fs::remove_dir_all(&dir);

@@ -133,3 +133,9 @@ expect:
         - { values: { list_id: "${groceries}", user_id: "${bob}" }, expect: deny }  # only the owner shares
       delete:
         - { where: "user_id = ${carol}", expect: allow }                           # she can leave the list
+
+lint:
+  ignore:
+    # anon is denied everything on shares, so RLS008 asks to revoke its grants. They come from Supabase's
+    # default privileges, like in any real project; RLS denies them.
+    - { rule: RLS008, table: shares, identity: anon, reason: "Supabase grants every public table to anon; RLS denies it" }

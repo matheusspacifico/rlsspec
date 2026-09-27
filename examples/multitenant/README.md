@@ -36,7 +36,12 @@ memberships    SIUD  SIUD  SIUD  SIUD
 projects       SIUD  SIUD  SIUD  SIUD
 tasks          SIUD  SIUD  SIUD  SIUD
 coverage 64/64 cells (100.0%) · 0 unspecified (warn)
+$ rlsspec lint
+0 errors · 0 warnings · 0 info · 0 ignored
 ```
+
+`rlsspec lint` reads the catalog only: RLS is enabled and forced on every table, `is_org_admin()` pins its
+`search_path`, and `app_anon` holds no grant on the tables it's denied.
 
 `schema.sql` and `policies.sql` are applied when the container starts, like migrations. `seed.sql` is
 rlsspec's `setup`: it runs inside rlsspec's transaction and is rolled back with everything else.

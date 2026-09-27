@@ -40,7 +40,14 @@ lists   SIUD  SIUD   SIUD  SIUD
 todos   SIUD  SIUD   SIUD  SIUD
 shares  SIUD  SIUD   SIUD  SIUD
 coverage 48/48 cells (100.0%) · 0 unspecified (fail)
+$ rlsspec lint
+0 errors · 0 warnings · 0 info · 1 ignored
 ```
+
+The ignored finding is RLS008 on `shares`: `anon` is denied everything there, yet holds privileges on it.
+Supabase's default privileges grant every table in `public` to `anon`, as in any real project, and RLS denies
+it; `lint.ignore` in the spec says so. (`bob` is denied everything on `shares` too, but his role,
+`authenticated`, needs those grants for alice and carol, so that's not a finding.)
 
 `database.url` connects as `postgres`, which in this image has `BYPASSRLS`, owns the tables and can `SET ROLE`
 to `anon` and `authenticated`. `schema.sql` and `policies.sql` run when the container starts, like

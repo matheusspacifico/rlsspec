@@ -55,7 +55,9 @@ jobs:
       - run: cargo build --locked
       - run: docker compose -f examples/multitenant/docker-compose.yml up -d --wait
       # Any non-zero exit (failures or inconclusive cases) fails the job.
-      - run: ./target/debug/rlsspec test -c examples/multitenant/rlsspec.yaml
+      - run: |
+          ./target/debug/rlsspec test -c examples/multitenant/rlsspec.yaml
+          ./target/debug/rlsspec lint -c examples/multitenant/rlsspec.yaml
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
 
@@ -76,5 +78,6 @@ jobs:
       - run: |
           ./target/debug/rlsspec test -c examples/supabase-todo/rlsspec.yaml
           ./target/debug/rlsspec cover -c examples/supabase-todo/rlsspec.yaml
+          ./target/debug/rlsspec lint -c examples/supabase-todo/rlsspec.yaml
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:54330/postgres

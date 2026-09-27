@@ -98,7 +98,7 @@ impl Supabase {
 
 #[test]
 #[ignore = "needs the supabase/postgres image"]
-fn supabase_todo_example_is_green_and_fully_covered() {
+fn supabase_todo_example_is_green_fully_covered_and_lint_clean() {
     let db = supabase(&[]);
     insta::assert_snapshot!("supabase_todo_example_is_green", db.run(0));
 
@@ -106,6 +106,11 @@ fn supabase_todo_example_is_green_and_fully_covered() {
     assert_eq!(out.code, Some(0), "{}", out.stderr);
     assert_eq!(out.stderr, "");
     insta::assert_snapshot!("supabase_todo_example_is_fully_covered", out.stdout);
+
+    let out = db.rlsspec(&["lint", "-c", &format!("{EXAMPLE}/rlsspec.yaml")]);
+    assert_eq!(out.code, Some(0), "{}", out.stderr);
+    assert_eq!(out.stderr, "");
+    assert_eq!(out.stdout, "0 errors · 0 warnings · 0 info · 1 ignored\n");
 }
 
 #[test]
