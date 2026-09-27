@@ -116,7 +116,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --locked
       - run: docker compose -f examples/multitenant/docker-compose.yml up -d --wait
-      # No release to download yet: RLSSPEC_ACTION_BINARY makes the action use this build.
+      # RLSSPEC_ACTION_BINARY makes the action use this build, so the action tests track main.
       - uses: ./
         id: green
         env:
@@ -134,6 +134,15 @@ jobs:
       - run: |
           test "${{ steps.green.outputs.exit-code }}" = 0
           grep -q '<testsuites name="rlsspec test" tests="89"' reports/rlsspec.xml
+      # The download path: a published release, its archive checked against the release's .sha256.
+      - uses: ./
+        id: released
+        with:
+          version: 0.1.0
+          config: examples/multitenant/rlsspec.yaml
+      - run: |
+          test "${{ steps.released.outputs.exit-code }}" = 0
+          "$RUNNER_TEMP"/rlsspec-v0.1.0-*/rlsspec version | grep -qx 'rlsspec 0.1.0'
       - run: docker compose -f examples/multitenant/docker-compose.yml exec -T db psql -q -U postgres < examples/multitenant/broken.sql
       - uses: ./
         id: red
