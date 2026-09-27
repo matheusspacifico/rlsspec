@@ -13,7 +13,8 @@ const LITERAL_MAX: usize = 12;
 
 struct Line {
     style: Style,
-    mark: &'static str,
+    /// Usually one; a folded line with both a failure and an inconclusive op shows `✗?`.
+    marks: Vec<(Style, &'static str)>,
     identity: String,
     op: String,
     description: String,
@@ -32,7 +33,7 @@ fn line(result: &CaseResult) -> Line {
     let (style, mark, detail) = marked(&result.outcome);
     Line {
         style,
-        mark,
+        marks: vec![(style, mark)],
         identity: result.identity.clone(),
         op: result.op.as_str().to_owned(),
         description: result.description.clone(),
@@ -42,12 +43,26 @@ fn line(result: &CaseResult) -> Line {
 
 /// One line for all the cases an identity got from `defaults` on a table.
 fn aggregate(results: &[&CaseResult]) -> Line {
-    let worst = results.iter().map(|r| &r.outcome).max_by_key(|o| match o {
-        Outcome::Pass(_) => 0,
-        Outcome::Inconclusive(_) => 1,
-        Outcome::Fail(_) => 2,
-    });
-    let (style, mark, _) = worst.map_or((style::PASS, "✓", ""), marked);
+    let failed = results
+        .iter()
+        .find(|r| matches!(r.outcome, Outcome::Fail(_)));
+    let inconclusive = results
+        .iter()
+        .find(|r| matches!(r.outcome, Outcome::Inconclusive(_)));
+    let marks: Vec<(Style, &str)> = [failed, inconclusive]
+        .into_iter()
+        .flatten()
+        .map(|r| {
+            let (style, mark, _) = marked(&r.outcome);
+            (style, mark)
+        })
+        .collect();
+    let marks = if marks.is_empty() {
+        vec![(style::PASS, "✓")]
+    } else {
+        marks
+    };
+    let style = marks[0].0;
 
     let mut descriptions: Vec<&str> = results.iter().map(|r| r.description.as_str()).collect();
     descriptions.dedup();
@@ -79,7 +94,7 @@ fn aggregate(results: &[&CaseResult]) -> Line {
     }
     Line {
         style,
-        mark,
+        marks,
         identity: results
             .first()
             .map_or(String::new(), |r| r.identity.clone()),
@@ -141,6 +156,7 @@ pub fn render(report: &Report) -> String {
                 .max()
                 .unwrap_or(0)
         };
+        let mark_width = rows.iter().map(|r| r.marks.len()).max().unwrap_or(1);
         let identity_width = width(|r| &r.identity);
         let op_width = width(|r| &r.op);
         let description_width = width(|r| &r.description);
@@ -148,17 +164,22 @@ pub fn render(report: &Report) -> String {
         let _ = writeln!(out, "{header}{table}{header:#}");
         for Line {
             style: s,
-            mark,
+            marks,
             identity,
             op,
             description,
             detail,
         } in &rows
         {
+            let mut mark = String::new();
+            for (style, m) in marks {
+                let _ = write!(mark, "{style}{m}{style:#}");
+            }
+            mark.push_str(&" ".repeat(mark_width - marks.len()));
             let detail_style = if *s == style::PASS { Style::new() } else { *s };
             let _ = writeln!(
                 out,
-                "  {s}{mark}{s:#} {identity:<identity_width$}  {muted}{op:<op_width$}{muted:#}  {description:<description_width$}  {detail_style}{detail}{detail_style:#}"
+                "  {mark} {identity:<identity_width$}  {muted}{op:<op_width$}{muted:#}  {description:<description_width$}  {detail_style}{detail}{detail_style:#}"
             );
         }
     }
@@ -409,6 +430,42 @@ mod tests {
   ? bob    select  deny  vacuous
 coverage 0/0 cells · 0 unspecified (warn)
 1 failed · 1 passed · 1 inconclusive
+"
+        );
+    }
+
+    #[test]
+    fn folded_defaults_mark_inconclusive_and_both() {
+        let case = |identity: &str, op, outcome| CaseResult {
+            table: "notes".into(),
+            identity: identity.into(),
+            op,
+            description: "deny".into(),
+            outcome,
+            origin: Origin::Default,
+            span: crate::config::Span::default(),
+        };
+        let pass = || Outcome::Pass("ok".into());
+        let unsure = || Outcome::Inconclusive("fk".into());
+        let report = Report {
+            results: vec![
+                case("ana", Op::Select, pass()),
+                case("ana", Op::Delete, unsure()),
+                case("ben", Op::Insert, Outcome::Fail("policy".into())),
+                case("ben", Op::Delete, unsure()),
+                case("cleo", Op::Select, pass()),
+                case("cleo", Op::Delete, pass()),
+            ],
+            ..Report::default()
+        };
+        assert_eq!(
+            plain(&render(&report)),
+            "notes
+  ?  ana   *  deny  1/2 ops · delete: fk
+  ✗? ben   *  deny  0/2 ops · insert: policy · delete: fk
+  ✓  cleo  *  deny  2/2 ops
+coverage 0/0 cells · 0 unspecified (warn)
+1 failed · 3 passed · 2 inconclusive
 "
         );
     }
