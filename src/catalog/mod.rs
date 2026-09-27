@@ -1,6 +1,9 @@
+pub mod lint;
+
 use postgres::Transaction;
 
 use crate::pg;
+use lint::policy_applies_to_role;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Table {
@@ -64,8 +67,8 @@ FROM pg_attribute a
 WHERE a.attrelid = ANY($1) AND a.attnum > 0 AND NOT a.attisdropped
 ORDER BY a.attrelid, a.attnum";
 
-// A policy applies to `role` when it targets PUBLIC (oid 0) or a role whose privileges `role` has.
-const INSERT_ACCESS: &str = "
+const INSERT_ACCESS: &str = concat!(
+    "
 SELECT has_table_privilege($2::name, c.oid, 'INSERT') OR has_any_column_privilege($2::name, c.oid, 'INSERT'),
        r.rolsuper OR r.rolbypassrls,
        c.relrowsecurity,
@@ -74,12 +77,13 @@ SELECT has_table_privilege($2::name, c.oid, 'INSERT') OR has_any_column_privileg
        coalesce((SELECT array_agg(p.polname::text ORDER BY p.polname)
                  FROM pg_policy p
                  WHERE p.polrelid = c.oid AND p.polpermissive AND p.polcmd IN ('a', '*')
-                   AND (0 = ANY(p.polroles)
-                        OR EXISTS (SELECT 1 FROM unnest(p.polroles) AS pr(oid)
-                                   WHERE pr.oid <> 0 AND pg_has_role($2::name, pr.oid, 'USAGE')))),
+                   AND ",
+    policy_applies_to_role!(),
+    "),
                 '{}')
 FROM pg_class c, pg_roles r
-WHERE c.oid = $1 AND r.rolname = $2::name";
+WHERE c.oid = $1 AND r.rolname = $2::name"
+);
 
 const FIRST_UPDATABLE_COLUMN: &str = "
 SELECT a.attname::text
