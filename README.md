@@ -69,12 +69,13 @@ Working now:
 - **Vendor-neutral**: an identity is a Postgres role + session settings (GUCs), so it fits any RLS design.
 - A **`supabase` preset**: give an identity JWT `claims` and `auth.uid()`, `auth.role()` and `auth.jwt()` just
   work (see [Supabase](#supabase)).
-- **CI-friendly** exit codes: `0` all good, `1` failures, `2` config/connection errors or inconclusive cases.
+- **`rlsspec lint`** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`,
+  unsafe `SECURITY DEFINER` functions, views that bypass RLS, grants nobody should use (see [Lint](#lint)).
+- **CI-friendly** exit codes: `0` all good, `1` failures or lint errors, `2` config/connection errors or
+  inconclusive cases.
 
 Planned for v0.1:
 
-- **Lint** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`, unsafe
-  `SECURITY DEFINER` functions, views that bypass RLS.
 - JSON and JUnit output, prebuilt binaries, a GitHub Action.
 
 ## Getting started
@@ -190,7 +191,44 @@ can switch to `anon` and `authenticated`), e.g. the Supabase CLI's local databas
 `postgres://postgres:postgres@127.0.0.1:54322/postgres`. `rlsspec init --preset supabase` scaffolds `anon`
 and `authenticated` instead of one identity per role; `service_role` bypasses RLS and is left out.
 
-Commands: `test`, `cover`, `init`, `version`. Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
+### Lint
+
+`rlsspec lint` loads the spec like `test` (including `setup`) and reads the catalog only: no case runs and no
+identity is applied. It checks the roles of your identities, so a role no identity uses is never reported.
+
+| Rule | Severity | Finding |
+|---|---|---|
+| RLS001 | error | A table in scope without RLS enabled |
+| RLS002 | error | RLS enabled but not forced, on a table an identity's role owns (the owner bypasses RLS) |
+| RLS003 | error | An identity's role is superuser or has `BYPASSRLS` |
+| RLS004 | warn | A permissive `INSERT`/`UPDATE`/`DELETE`/`ALL` policy for an identity's role with `USING (true)` or `WITH CHECK (true)` |
+| RLS005 | warn | A `SECURITY DEFINER` function an identity's role can execute, without a pinned `search_path` |
+| RLS006 | info | RLS enabled with no policy: everything is denied (often intended, sometimes a forgotten migration) |
+| RLS007 | warn | A view readable by an identity's role that reads RLS tables as its owner (a superuser, `BYPASSRLS` or the tables' owner) without `security_invoker`, or a readable materialized view over RLS tables (PostgreSQL 15+) |
+| RLS008 | warn | An identity denied every operation on a table in the spec, whose role still holds privileges on it (when every identity with that role is denied everything there) |
+
+```console
+$ rlsspec lint
+✗ RLS001  tags                row level security is not enabled: every role with a grant sees every row
+! RLS004  notes          app  permissive UPDATE policy `anyone_edits` has USING (true): it allows every row
+! RLS005  public.leak()  app  SECURITY DEFINER without a pinned search_path: add SET search_path = ''
+1 error · 2 warnings · 0 info · 1 ignored
+```
+
+It exits `1` when an error is left; warnings and info never fail. To accept a finding, ignore it with a reason:
+
+```yaml
+lint:
+  ignore:
+    - { rule: RLS006, table: audit_log, reason: "written only through a SECURITY DEFINER function" }
+    - { rule: RLS008, table: shares, identity: anon, reason: "Supabase grants every public table to anon" }
+```
+
+An entry matches every finding of its rule whose keys all match: without `table`, every table. Rules take
+`table`, `identity`, `function` or `view` (`name` or `schema.name`) as fits the finding. An entry that matches
+nothing is reported as a stale ignore, so ignores can't outlive what they excused.
+
+Commands: `test`, `cover`, `lint`, `init`, `version`. Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
 `--no-color`.
 
 ## Safety
