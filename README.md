@@ -59,6 +59,23 @@ coverage 86/96 cells (89.6%) · 10 unspecified
   so `auth.uid()` and friends just work.
 - **CI-friendly**: single static binary, stable exit codes, JSON and JUnit output, GitHub Action.
 
+## Safety
+
+`rlsspec` is built to leave your data untouched: every check runs inside a single transaction that is always
+rolled back, and it refuses non-local hosts unless you allow them. Still, it runs real queries as a privileged
+role, so:
+
+- **Run it against local, CI or disposable databases** (a container, a restored copy, a branch). Don't point it
+  at production.
+- While it runs, it holds row and table locks and an open transaction. On a busy database that can block other
+  sessions.
+- Some effects can't be rolled back: sequence values, `dblink`/foreign-data-wrapper writes, and triggers with
+  side effects outside the database.
+- `rlsspec.yaml` contains SQL that is executed as written. Only run specs you trust.
+- Reports can include primary keys of real rows.
+
+This software is provided "as is", without warranty of any kind; see the [license](#license).
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
