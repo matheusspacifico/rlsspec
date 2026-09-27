@@ -149,3 +149,22 @@ fn errors_stay_text_on_stderr_whatever_the_format() {
         assert_eq!(json.stderr, text.stderr, "{command}");
     }
 }
+
+#[test]
+fn cover_has_no_junit_report() {
+    let out = rlsspec(&[
+        "cover",
+        "-c",
+        "tests/fixtures/cli/valid.yaml",
+        "--format",
+        "junit",
+    ]);
+    assert_eq!(out.code, Some(2));
+    assert_eq!(out.stdout, "");
+    assert!(
+        out.stderr
+            .contains("invalid value 'junit' for '--format <FORMAT>'"),
+        "{}",
+        out.stderr
+    );
+}

@@ -1,0 +1,28 @@
+---
+source: tests/format.rs
+expression: out
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="rlsspec test" tests="13" skipped="0" failures="1" errors="0">
+    <testsuite name="notes" tests="8" skipped="0" errors="0" failures="0">
+        <testcase name="alice select all" classname="notes"/>
+        <testcase name="alice insert deny" classname="notes"/>
+        <testcase name="alice update deny" classname="notes"/>
+        <testcase name="alice delete deny" classname="notes"/>
+        <testcase name="guest select deny" classname="notes"/>
+        <testcase name="guest insert deny" classname="notes"/>
+        <testcase name="guest update deny" classname="notes"/>
+        <testcase name="guest delete deny" classname="notes"/>
+    </testsuite>
+    <testsuite name="tags" tests="4" skipped="0" errors="0" failures="0">
+        <testcase name="guest select deny" classname="tags"/>
+        <testcase name="guest insert deny" classname="tags"/>
+        <testcase name="guest update deny" classname="tags"/>
+        <testcase name="guest delete deny" classname="tags"/>
+    </testsuite>
+    <testsuite name="coverage" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="alice coverage" classname="tags">
+            <failure message="unspecified: select, insert, update, delete">unspecified: select, insert, update, delete (unspecified: fail)</failure>
+        </testcase>
+    </testsuite>
+</testsuites>

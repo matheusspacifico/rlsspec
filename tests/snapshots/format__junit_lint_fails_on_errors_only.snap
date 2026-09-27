@@ -1,0 +1,37 @@
+---
+source: tests/format.rs
+expression: rest.to_string().unwrap()
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="rlsspec lint" tests="8" skipped="0" failures="1" errors="0">
+    <testsuite name="RLS001" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="tags" classname="RLS001">
+            <failure message="row level security is not enabled: every role with a grant sees every row">error: row level security is not enabled: every role with a grant sees every row</failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="RLS002" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="no findings" classname="RLS002"/>
+    </testsuite>
+    <testsuite name="RLS003" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="no findings" classname="RLS003"/>
+    </testsuite>
+    <testsuite name="RLS004" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="notes app" classname="RLS004">
+            <system-out>warn: permissive UPDATE policy `anyone_edits` has USING (true): it allows every row</system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="RLS005" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="no findings" classname="RLS005"/>
+    </testsuite>
+    <testsuite name="RLS006" tests="2" skipped="0" errors="0" failures="0">
+        <testcase name="audit_log" classname="RLS006">
+            <system-out>info: RLS is enabled with no policy: every row is denied (a forgotten migration?)</system-out>
+        </testcase>
+        <testcase name="tests/fixtures/format/lint.yaml:9" classname="RLS006">
+            <system-out>warn: stale ignore: no RLS006 finding matches it; remove it</system-out>
+        </testcase>
+    </testsuite>
+    <testsuite name="RLS008" tests="1" skipped="0" errors="0" failures="0">
+        <testcase name="no findings" classname="RLS008"/>
+    </testsuite>
+</testsuites>

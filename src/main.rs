@@ -45,8 +45,8 @@ enum Command {
     },
     /// Print which identity × table × operation cells have a case, without running any
     Cover {
-        #[arg(long, value_enum, default_value_t = Format::Text)]
-        format: Format,
+        #[arg(long, value_enum, default_value_t = CoverFormat::Text)]
+        format: CoverFormat,
     },
     /// Check the catalog for common RLS mistakes (rules RLS001–RLS008), without running any case
     Lint {
@@ -75,6 +75,17 @@ enum Command {
 /// How a report is written to stdout. Errors are text on stderr whatever the format.
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum Format {
+    /// Human-readable, coloured on a terminal
+    Text,
+    /// One JSON document (schema_version 1)
+    Json,
+    /// JUnit XML, for CI test reporters
+    Junit,
+}
+
+/// `cover` runs no test, so it has no JUnit report.
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum CoverFormat {
     /// Human-readable, coloured on a terminal
     Text,
     /// One JSON document (schema_version 1)
@@ -125,16 +136,17 @@ fn test(cli: &Cli, format: Format) -> Result<ExitCode> {
     match format {
         Format::Text => anstream::print!("{}", report::text::render(&report)),
         Format::Json => print!("{}", report::json::render(&report)?),
+        Format::Junit => print!("{}", report::junit::render(&report)?),
     }
     Ok(ExitCode::from(report.exit_code()))
 }
 
-fn cover(cli: &Cli, format: Format) -> Result<ExitCode> {
+fn cover(cli: &Cli, format: CoverFormat) -> Result<ExitCode> {
     let (config, source) = load(cli)?;
     let coverage = runner::cover(&config, &source)?;
     match format {
-        Format::Text => anstream::print!("{}", report::text::render_cover(&coverage)),
-        Format::Json => print!("{}", report::json::render_cover(&coverage)?),
+        CoverFormat::Text => anstream::print!("{}", report::text::render_cover(&coverage)),
+        CoverFormat::Json => print!("{}", report::json::render_cover(&coverage)?),
     }
     Ok(ExitCode::from(u8::from(coverage.fails())))
 }
@@ -145,6 +157,7 @@ fn lint(cli: &Cli, format: Format) -> Result<ExitCode> {
     match format {
         Format::Text => anstream::print!("{}", report::text::render_lint(&report)),
         Format::Json => print!("{}", report::json::render_lint(&report)?),
+        Format::Junit => print!("{}", report::junit::render_lint(&report)?),
     }
     Ok(ExitCode::from(report.exit_code()))
 }

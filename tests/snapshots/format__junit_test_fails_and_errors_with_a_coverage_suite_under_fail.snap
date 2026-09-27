@@ -1,0 +1,39 @@
+---
+source: tests/format.rs
+expression: out
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="rlsspec test" tests="16" skipped="0" failures="3" errors="1">
+    <testsuite name="notes" tests="10" skipped="0" errors="1" failures="2">
+        <testcase name="alice select all" classname="notes"/>
+        <testcase name="alice insert values (id = 7, tenant_id = &apos;00000000-0000-4000-8000-00000000000a&apos;, author_id = &apos;00000000-0000-4000-8000-0000000a11ce&apos;, body = &apos;x&apos;) → allow" classname="notes">
+            <failure message="denied: new row violates row-level security policy for table &quot;notes&quot; (SQLSTATE 42501)">denied: new row violates row-level security policy for table &quot;notes&quot; (SQLSTATE 42501)
+at tests/fixtures/format/mixed.yaml:23:11</failure>
+        </testcase>
+        <testcase name="alice update where tenant_id = &apos;00000000-0000-4000-8000-00000000000a&apos; → allow" classname="notes"/>
+        <testcase name="alice update where tenant_id = &apos;00000000-0000-4000-8000-00000000000b&apos; → deny" classname="notes">
+            <failure message="affected 3 of 3 rows (expected 0)">affected 3 of 3 rows (expected 0)
+at tests/fixtures/format/mixed.yaml:26:11</failure>
+        </testcase>
+        <testcase name="alice update where id &gt; 100 → deny" classname="notes">
+            <error message="vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/format/mixed.yaml:27:11)">vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/format/mixed.yaml:27:11)</error>
+        </testcase>
+        <testcase name="alice delete deny" classname="notes"/>
+        <testcase name="guest select deny" classname="notes"/>
+        <testcase name="guest insert deny" classname="notes"/>
+        <testcase name="guest update deny" classname="notes"/>
+        <testcase name="guest delete deny" classname="notes"/>
+    </testsuite>
+    <testsuite name="tags" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="alice select rows: tenant_id = &apos;00000000-0000-4000-8000-00000000000a&apos;" classname="tags"/>
+        <testcase name="guest select deny" classname="tags"/>
+        <testcase name="guest insert deny" classname="tags"/>
+        <testcase name="guest update deny" classname="tags"/>
+        <testcase name="guest delete deny" classname="tags"/>
+    </testsuite>
+    <testsuite name="coverage" tests="1" skipped="0" errors="0" failures="1">
+        <testcase name="alice coverage" classname="tags">
+            <failure message="unspecified: insert, update, delete">unspecified: insert, update, delete (unspecified: fail)</failure>
+        </testcase>
+    </testsuite>
+</testsuites>
