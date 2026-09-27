@@ -39,3 +39,8 @@ rustls-native-certs = "0.8"
 [dev-dependencies]
 insta = "1.48"
 testcontainers-modules = { version = "0.15.0", features = ["postgres", "blocking"] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

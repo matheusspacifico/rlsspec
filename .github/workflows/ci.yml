@@ -39,6 +39,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --locked
 
+  dist:
+    name: dist plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Keep in step with cargo-dist-version in dist-workspace.toml. `dist plan` fails when
+      # release.yml no longer matches the config: run `dist generate` instead of editing it by hand.
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.0/cargo-dist-installer.sh | sh
+      - run: dist plan
+
   test:
     name: test (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
