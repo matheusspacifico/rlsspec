@@ -3,7 +3,7 @@ source: tests/select.rs
 expression: "run(\"subset_using_true\", 1)"
 ---
 notes
-  ✗ alice  select  rows: tenant_id = '…000a' (subset)  leaked 3 of 3 rows: id=4, id=5, id=6
+  ✗ alice  select  rows: tenant_id = '…000a' (subset)  leaked 3 of the 3 rows it should not see: id=4, id=5, id=6
 coverage 1/8 cells (12.5%) · 7 unspecified (warn)
 notes
   ○ alice  insert, update, delete

@@ -5,7 +5,7 @@ expression: "report(\"defaults_guest_all_true\", 1)"
 notes
   ✓ alice  *       select all, delete deny            2/2 ops
   ✓ alice  update  where tenant_id = '…000a' → allow  affected 3 of 3 rows
-  ✗ guest  *       deny                               2/4 ops · select: leaked 6 of 6 rows: id=1, id=2, id=3, id=4, id=5, … · update: affected 6 of 6 rows (expected 0)
+  ✗ guest  *       deny                               2/4 ops · select: leaked 6 of the 6 rows it should not see: id=1, id=2, id=3, id=4, id=5, … · update: affected 6 of 6 rows (expected 0)
 tags
   ✓ alice  *  select rows: tenant_id = '…000a', update deny, delete deny  3/3 ops
   ✓ guest  *  deny                                                        4/4 ops

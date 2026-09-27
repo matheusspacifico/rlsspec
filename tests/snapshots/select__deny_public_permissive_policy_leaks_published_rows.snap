@@ -3,7 +3,7 @@ source: tests/select.rs
 expression: "run(\"deny_permissive_widens\", 1)"
 ---
 notes
-  ✗ guest  select  deny  leaked 2 of 6 rows: id=2, id=4
+  ✗ guest  select  deny  leaked 2 of the 6 rows it should not see: id=2, id=4
 coverage 1/8 cells (12.5%) · 7 unspecified (warn)
 notes
   ○ alice  select, insert, update, delete

@@ -411,7 +411,10 @@ mod tests {
         Report {
             results: vec![
                 case("alice", Outcome::Pass("0 visible".into())),
-                case("guest", Outcome::Fail("leaked 1 of 2 rows: id=1".into())),
+                case(
+                    "guest",
+                    Outcome::Fail("leaked 1 of the 2 rows it should not see: id=1".into()),
+                ),
                 case("bob", Outcome::Inconclusive("vacuous".into())),
             ],
             ..Report::default()
@@ -426,7 +429,7 @@ mod tests {
             anstream::adapter::strip_str(&styled).to_string(),
             "notes
   ✓ alice  select  deny  0 visible
-  ✗ guest  select  deny  leaked 1 of 2 rows: id=1
+  ✗ guest  select  deny  leaked 1 of the 2 rows it should not see: id=1
   ? bob    select  deny  vacuous
 coverage 0/0 cells · 0 unspecified (warn)
 1 failed · 1 passed · 1 inconclusive

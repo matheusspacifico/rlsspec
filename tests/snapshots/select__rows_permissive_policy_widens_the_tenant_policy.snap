@@ -3,7 +3,7 @@ source: tests/select.rs
 expression: "run(\"rows_permissive_widens\", 1)"
 ---
 notes
-  ✗ alice  select  rows: tenant_id = '…000a'  leaked 1 of 3 rows: id=4
+  ✗ alice  select  rows: tenant_id = '…000a'  leaked 1 of the 3 rows it should not see: id=4
 coverage 1/8 cells (12.5%) · 7 unspecified (warn)
 notes
   ○ alice  insert, update, delete

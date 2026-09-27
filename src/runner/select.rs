@@ -97,16 +97,17 @@ pub fn check(
     let mut problems = Vec::new();
     if !leaked.is_empty() {
         problems.push(format!(
-            "leaked {} of {} rows: {}",
+            "leaked {} of {} it should not see: {}",
             leaked.len(),
-            rows.len() - expected,
+            the_rows(rows.len() - expected),
             samples(&leaked)
         ));
     }
     if !hidden.is_empty() && !subset {
         let mut text = format!(
-            "hidden {} of {expected} rows: {}",
+            "hidden {} of {} it should see: {}",
             hidden.len(),
+            the_rows(expected),
             samples(&hidden)
         );
         if denied {
@@ -185,6 +186,12 @@ fn label(columns: &[String], values: &[Option<String>], ctid: &str) -> String {
             values.iter().map(value).collect::<Vec<_>>().join(", ")
         ),
     }
+}
+
+/// `the 3 rows`: the whole set a leaked or hidden count is out of.
+fn the_rows(count: usize) -> String {
+    let unit = if count == 1 { "row" } else { "rows" };
+    format!("the {count} {unit}")
 }
 
 fn samples(rows: &[&Row]) -> String {

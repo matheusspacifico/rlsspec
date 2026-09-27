@@ -3,7 +3,7 @@ source: tests/select.rs
 expression: "run(\"all_too_strict\", 1)"
 ---
 notes
-  ✗ guest  select  all  hidden 4 of 6 rows: id=1, id=3, id=5, id=6
+  ✗ guest  select  all  hidden 4 of the 6 rows it should see: id=1, id=3, id=5, id=6
 coverage 1/8 cells (12.5%) · 7 unspecified (warn)
 notes
   ○ alice  select, insert, update, delete
