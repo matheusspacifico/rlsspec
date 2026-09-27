@@ -193,3 +193,22 @@ fn safety_timeouts_default_and_validate() {
         "version: 1\ndatabase: { url: postgres://localhost/db }\nsafety:\n  lock_timeout: 0s\n  statement_timeout: 5 seconds\nidentities:\n  a: { role: app }\n"
     ));
 }
+
+#[test]
+fn insert_allow_shorthand_is_rejected() {
+    insta::assert_snapshot!(errors(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { insert: allow }
+expect:
+  documents:
+    alice:
+      insert: deny
+      update: allow
+"#
+    ));
+}

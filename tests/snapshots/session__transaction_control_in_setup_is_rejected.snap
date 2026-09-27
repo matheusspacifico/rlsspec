@@ -8,4 +8,4 @@ error: `COMMIT` is not allowed in setup files: rlsspec runs everything in one tr
 3 | /* done */ COMMIT;
   |            ^
 
-error: could not load tests/fixtures/session/commit.sql (1 error)
+error: stopped before running any case (1 error in tests/fixtures/session/commit.sql)

@@ -1,0 +1,11 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\ndefaults:\n  alice:\n    \"*\": { insert: allow }\nexpect:\n  documents:\n    alice:\n      insert: deny\n      update: allow\n\"#)"
+---
+error: `insert: allow` has nothing to insert; write cases with `values` and `expect: allow`
+ --> rlsspec.yaml:7:20
+  |
+7 |     "*": { insert: allow }
+  |                    ^
+
+error: could not load rlsspec.yaml (1 error)

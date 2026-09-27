@@ -3,6 +3,7 @@ use std::path::Path;
 
 use serde_saphyr::Location;
 
+use super::Stage;
 use crate::style;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -26,7 +27,13 @@ pub struct Diagnostic {
     pub message: String,
 }
 
-pub fn render(path: &Path, source: &str, diagnostics: &[Diagnostic], styled: bool) -> String {
+pub fn render(
+    path: &Path,
+    source: &str,
+    diagnostics: &[Diagnostic],
+    stage: Stage,
+    styled: bool,
+) -> String {
     let mut out = String::new();
     for diagnostic in diagnostics {
         render_one(&mut out, path, source, diagnostic, styled);
@@ -34,7 +41,13 @@ pub fn render(path: &Path, source: &str, diagnostics: &[Diagnostic], styled: boo
     }
     let count = diagnostics.len();
     let plural = if count == 1 { "" } else { "s" };
-    let message = format!("could not load {} ({count} error{plural})", path.display());
+    let message = match stage {
+        Stage::Load => format!("could not load {} ({count} error{plural})", path.display()),
+        Stage::Run => format!(
+            "stopped before running any case ({count} error{plural} in {})",
+            path.display()
+        ),
+    };
     heading(&mut out, &message, styled);
     out
 }

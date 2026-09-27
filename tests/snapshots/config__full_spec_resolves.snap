@@ -126,28 +126,44 @@ Config {
                         [
                             InsertCase {
                                 values: [
-                                    (
-                                        "tenant_id",
-                                        Some(
+                                    Assignment {
+                                        column: "tenant_id",
+                                        value: Some(
                                             "0191e6a2-0000-7000-8000-00000000000a",
                                         ),
-                                    ),
-                                    (
-                                        "title",
-                                        Some(
+                                        span: Span {
+                                            line: 25,
+                                            column: 23,
+                                        },
+                                    },
+                                    Assignment {
+                                        column: "title",
+                                        value: Some(
                                             "x",
                                         ),
-                                    ),
-                                    (
-                                        "rank",
-                                        Some(
+                                        span: Span {
+                                            line: 25,
+                                            column: 49,
+                                        },
+                                    },
+                                    Assignment {
+                                        column: "rank",
+                                        value: Some(
                                             "1.50",
                                         ),
-                                    ),
-                                    (
-                                        "archived_at",
-                                        None,
-                                    ),
+                                        span: Span {
+                                            line: 25,
+                                            column: 61,
+                                        },
+                                    },
+                                    Assignment {
+                                        column: "archived_at",
+                                        value: None,
+                                        span: Span {
+                                            line: 25,
+                                            column: 73,
+                                        },
+                                    },
                                 ],
                                 expect: Allow,
                                 span: Span {
@@ -157,18 +173,26 @@ Config {
                             },
                             InsertCase {
                                 values: [
-                                    (
-                                        "tenant_id",
-                                        Some(
+                                    Assignment {
+                                        column: "tenant_id",
+                                        value: Some(
                                             "0191e6a2-0000-7000-8000-00000000000b",
                                         ),
-                                    ),
-                                    (
-                                        "title",
-                                        Some(
+                                        span: Span {
+                                            line: 26,
+                                            column: 23,
+                                        },
+                                    },
+                                    Assignment {
+                                        column: "title",
+                                        value: Some(
                                             "x",
                                         ),
-                                    ),
+                                        span: Span {
+                                            line: 26,
+                                            column: 49,
+                                        },
+                                    },
                                 ],
                                 expect: Deny,
                                 span: Span {
@@ -195,12 +219,16 @@ Config {
                                 predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
                                 set: Some(
                                     [
-                                        (
-                                            "tenant_id",
-                                            Some(
+                                        Assignment {
+                                            column: "tenant_id",
+                                            value: Some(
                                                 "0191e6a2-0000-7000-8000-00000000000b",
                                             ),
-                                        ),
+                                            span: Span {
+                                                line: 29,
+                                                column: 54,
+                                            },
+                                        },
                                     ],
                                 ),
                                 expect: Deny,

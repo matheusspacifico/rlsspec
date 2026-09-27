@@ -239,7 +239,7 @@ fn unsupported_writes(table: &str, block: &Block, report: &mut Report) {
         Some(Writes::Shorthand { expect, .. }) => push(Op::Insert, expectation(*expect).into()),
         Some(Writes::Cases(cases)) => {
             for case in cases {
-                let columns: Vec<&str> = case.values.iter().map(|(c, _)| c.as_str()).collect();
+                let columns: Vec<&str> = case.values.iter().map(|a| a.column.as_str()).collect();
                 push(
                     Op::Insert,
                     format!(

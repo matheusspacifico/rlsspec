@@ -103,7 +103,14 @@ pub enum Writes<C> {
     Cases(Vec<C>),
 }
 
-pub type Assignments = Vec<(String, Option<String>)>;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Assignment {
+    pub column: String,
+    pub value: Option<String>,
+    pub span: Span,
+}
+
+pub type Assignments = Vec<Assignment>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsertCase {
@@ -135,12 +142,21 @@ pub enum ConfigError {
         #[source]
         source: io::Error,
     },
-    #[error("{}", diagnostic::render(path, text, diagnostics, false))]
+    #[error("{}", diagnostic::render(path, text, diagnostics, *stage, false))]
     Invalid {
         path: PathBuf,
         text: String,
         diagnostics: Vec<Diagnostic>,
+        stage: Stage,
     },
+}
+
+/// When a located error was found: while loading the config, or at run time (setup files,
+/// table and column resolution, identity preflight), before any case ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stage {
+    Load,
+    Run,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,11 +177,13 @@ impl Source {
         })
     }
 
+    /// A run-time error located in this file.
     pub fn invalid(&self, diagnostics: Vec<Diagnostic>) -> ConfigError {
         ConfigError::Invalid {
             path: self.path.clone(),
             text: self.text.clone(),
             diagnostics,
+            stage: Stage::Run,
         }
     }
 }
@@ -178,7 +196,8 @@ impl ConfigError {
                 path,
                 text,
                 diagnostics,
-            } => Some(diagnostic::render(path, text, diagnostics, true)),
+                stage,
+            } => Some(diagnostic::render(path, text, diagnostics, *stage, true)),
             ConfigError::Read { .. } => None,
         }
     }
@@ -199,6 +218,7 @@ pub fn parse(
         path: path.to_path_buf(),
         text: text.to_owned(),
         diagnostics,
+        stage: Stage::Load,
     };
     let options = serde_saphyr::options! { with_snippet: false };
     let raw = serde_saphyr::from_str_with_options(text, options).map_err(|err| {

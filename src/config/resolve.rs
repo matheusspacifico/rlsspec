@@ -9,8 +9,8 @@ use super::raw::{
 };
 use super::vars::{self, Mode, Reference};
 use super::{
-    Assignments, Block, Config, Database, DeleteCase, Diagnostic, Identity, InsertCase, Ops,
-    Safety, Select, SelectCase, Span, TableRef, UpdateCase, Writes,
+    Assignment, Assignments, Block, Config, Database, DeleteCase, Diagnostic, Expectation,
+    Identity, InsertCase, Ops, Safety, Select, SelectCase, Span, TableRef, UpdateCase, Writes,
 };
 
 const SUPPORTED_VERSION: u32 = 1;
@@ -287,6 +287,15 @@ impl Resolver<'_> {
                 "no operations given; expected select, insert, update or delete".into(),
             );
         }
+        if let Some(insert) = &raw.insert
+            && matches!(insert.value, RawWrites::Shorthand(Expectation::Allow))
+        {
+            self.error(
+                span(insert),
+                "`insert: allow` has nothing to insert; write cases with `values` and `expect: allow`"
+                    .into(),
+            );
+        }
         let ops = Ops {
             select: raw.select.map(|select| self.select(select)),
             insert: raw.insert.map(|writes| {
@@ -373,7 +382,11 @@ impl Resolver<'_> {
                     self.substitute(text, span(value), Mode::Raw)
                         .unwrap_or_default()
                 });
-                (column.value.clone(), resolved)
+                Assignment {
+                    column: column.value.clone(),
+                    value: resolved,
+                    span: span(column),
+                }
             })
             .collect()
     }

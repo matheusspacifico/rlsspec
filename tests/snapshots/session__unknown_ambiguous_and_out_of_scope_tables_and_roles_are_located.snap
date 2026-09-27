@@ -26,4 +26,4 @@ error: table `nope` not found in schemas public, app
 16 |   nope:
    |   ^
 
-error: could not load tests/fixtures/session/tables.yaml (4 errors)
+error: stopped before running any case (4 errors in tests/fixtures/session/tables.yaml)
