@@ -1,0 +1,8 @@
+---
+source: tests/writes.rs
+expression: "report(\"insert_deny_public_policy\", 1)"
+---
+notes
+  ✗ alice  insert  deny  `app` has INSERT privilege and permissive policy `suggest` applies to it; write `insert` cases with `values` to check which rows it accepts
+  ✓ guest  insert  deny  deny (no privilege)
+1 failed · 1 passed · 0 inconclusive

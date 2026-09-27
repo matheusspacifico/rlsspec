@@ -1,3 +1,4 @@
+mod insert_deny;
 mod select;
 mod write;
 
@@ -197,9 +198,12 @@ impl Cell<'_> {
             self.push(report, Op::Select, select::describe(&case.select), outcome);
         }
         match &ops.insert {
+            // `insert: allow` is rejected when the config is loaded.
             Some(Writes::Shorthand { expect, .. }) => {
+                let outcome =
+                    session.case(|tx| insert_deny::check(tx, table, &self.name, identity))??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Insert, description, Outcome::Unsupported);
+                self.push(report, Op::Insert, description, outcome);
             }
             Some(Writes::Cases(cases)) => {
                 for case in cases {

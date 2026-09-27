@@ -83,3 +83,13 @@ fn unknown_and_generated_columns_are_located() {
     assert_eq!(out.stdout, "");
     insta::assert_snapshot!(out.stderr);
 }
+
+#[test]
+fn insert_deny_pass_without_a_privilege_or_a_policy() {
+    insta::assert_snapshot!(report("insert_deny_pass", 0));
+}
+
+#[test]
+fn insert_deny_fails_when_a_public_permissive_policy_applies() {
+    insta::assert_snapshot!(report("insert_deny_public_policy", 1));
+}
