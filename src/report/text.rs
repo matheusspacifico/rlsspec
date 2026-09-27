@@ -49,7 +49,7 @@ fn aggregate(results: &[&CaseResult]) -> Line {
     let mut descriptions: Vec<&str> = results.iter().map(|r| r.description.as_str()).collect();
     descriptions.dedup();
     let description = match descriptions.as_slice() {
-        [one] => (*one).to_owned(),
+        [one] if results.len() > 1 => (*one).to_owned(),
         _ => results
             .iter()
             .map(|r| format!("{} {}", r.op.as_str(), r.description))
