@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_saphyr::{DefaultMessageFormatter, MessageFormatter};
 
+use crate::lint::Rule;
 use crate::preset;
 
 pub use diagnostic::{Diagnostic, Span};
@@ -24,6 +25,24 @@ pub struct Config {
     pub unspecified: Unspecified,
     pub defaults: Vec<Block>,
     pub expect: Vec<Block>,
+    pub lint: Lint,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Lint {
+    pub ignore: Vec<Ignore>,
+}
+
+/// A `lint.ignore` entry: it hides every finding of `rule` whose keys all match the ones given.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ignore {
+    pub rule: Rule,
+    pub table: Option<String>,
+    pub identity: Option<String>,
+    pub function: Option<String>,
+    pub view: Option<String>,
+    pub reason: String,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

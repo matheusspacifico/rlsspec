@@ -2,6 +2,7 @@ pub mod catalog;
 pub mod config;
 pub mod identity;
 pub mod init;
+pub mod lint;
 pub mod pg;
 pub mod preset;
 pub mod report;

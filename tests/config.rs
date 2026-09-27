@@ -55,6 +55,10 @@ expect:
       delete: deny
     public_web:
       select: { rows: "published", subset: true }
+lint:
+  ignore:
+    - { rule: RLS006, table: audit_log, reason: "write-only through a SECURITY DEFINER function" }
+    - { rule: RLS008, identity: public_web, reason: "grants managed elsewhere" }
 "#,
     )
     .unwrap();
@@ -240,4 +244,43 @@ expect:
         ops.insert,
         Some(Spec::Given(Writes::Shorthand { .. }))
     ));
+}
+
+#[test]
+fn lint_ignore_entries_are_validated() {
+    insta::assert_snapshot!(errors(
+        r#"version: 1
+database: { url: "${env:DATABASE_URL}" }
+identities:
+  alice: { role: app }
+lint:
+  ignore:
+    - { rule: RLS006, table: audit_log }
+    - { rule: RLS001, table: notes, reason: "  " }
+    - { rule: RLS009, table: notes, reason: "typo" }
+    - { rule: RLS001, identity: alice, reason: "RLS001 is about tables only" }
+    - { rule: RLS005, table: notes, function: leak, reason: "functions, not tables" }
+    - { rule: RLS003, identity: mallory, reason: "unknown identity" }
+"#
+    ));
+}
+
+#[test]
+fn lint_ignore_rejects_unknown_keys() {
+    let out = errors(
+        r#"version: 1
+database: { url: "${env:DATABASE_URL}" }
+identities:
+  alice: { role: app }
+lint:
+  ignore:
+    - { rule: RLS004, policy: notes_edit, reason: "not a key" }
+"#,
+    );
+    assert!(
+        out.starts_with(
+            "error: unknown field `policy`, expected one of rule, table, identity, function, view, reason\n --> rlsspec.yaml:7:23\n"
+        ),
+        "{out}"
+    );
 }

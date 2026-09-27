@@ -1,0 +1,41 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: \"${env:DATABASE_URL}\" }\nidentities:\n  alice: { role: app }\nlint:\n  ignore:\n    - { rule: RLS006, table: audit_log }\n    - { rule: RLS001, table: notes, reason: \"  \" }\n    - { rule: RLS009, table: notes, reason: \"typo\" }\n    - { rule: RLS001, identity: alice, reason: \"RLS001 is about tables only\" }\n    - { rule: RLS005, table: notes, function: leak, reason: \"functions, not tables\" }\n    - { rule: RLS003, identity: mallory, reason: \"unknown identity\" }\n\"#)"
+---
+error: ignore entry needs a `reason` saying why the finding is acceptable
+ --> rlsspec.yaml:7:7
+  |
+7 |     - { rule: RLS006, table: audit_log }
+  |       ^
+
+error: `reason` is empty
+ --> rlsspec.yaml:8:45
+  |
+8 |     - { rule: RLS001, table: notes, reason: "  " }
+  |                                             ^
+
+error: unknown rule `RLS009`; expected RLS001 to RLS008
+ --> rlsspec.yaml:9:15
+  |
+9 |     - { rule: RLS009, table: notes, reason: "typo" }
+  |               ^
+
+error: RLS001 findings have no `identity`; match them on `table`
+  --> rlsspec.yaml:10:33
+   |
+10 |     - { rule: RLS001, identity: alice, reason: "RLS001 is about tables only" }
+   |                                 ^
+
+error: RLS005 findings have no `table`; match them on `function` or `identity`
+  --> rlsspec.yaml:11:30
+   |
+11 |     - { rule: RLS005, table: notes, function: leak, reason: "functions, not tables" }
+   |                              ^
+
+error: unknown identity `mallory`; declare it under `identities`
+  --> rlsspec.yaml:12:33
+   |
+12 |     - { rule: RLS003, identity: mallory, reason: "unknown identity" }
+   |                                 ^
+
+error: could not load rlsspec.yaml (6 errors)

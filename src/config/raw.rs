@@ -30,6 +30,8 @@ pub struct RawConfig {
     pub defaults: SpannedMap<SpannedMap<RawOps>>,
     #[serde(default)]
     pub expect: SpannedMap<SpannedMap<RawOps>>,
+    #[serde(default)]
+    pub lint: RawLint,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +48,24 @@ pub struct RawSafety {
     pub allowed_hosts: Vec<String>,
     pub lock_timeout: Option<Spanned<String>>,
     pub statement_timeout: Option<Spanned<String>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RawLint {
+    #[serde(default)]
+    pub ignore: Vec<Spanned<RawIgnore>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RawIgnore {
+    pub rule: Spanned<String>,
+    pub table: Option<Spanned<String>>,
+    pub identity: Option<Spanned<String>>,
+    pub function: Option<Spanned<String>>,
+    pub view: Option<Spanned<String>>,
+    pub reason: Option<Spanned<String>>,
 }
 
 #[derive(Debug, Deserialize)]

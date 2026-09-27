@@ -5,15 +5,17 @@ use serde_saphyr::Spanned;
 
 use super::map::SpannedMap;
 use super::raw::{
-    RawConfig, RawDatabase, RawIdentity, RawOps, RawSafety, RawSelect, RawWrites, Value,
+    RawConfig, RawDatabase, RawIdentity, RawIgnore, RawLint, RawOps, RawSafety, RawSelect,
+    RawWrites, Value,
 };
 use super::vars::{self, Mode, Reference};
 use super::{
     Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
     DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Expectation, Extensions, Guc,
-    Identity, InsertCase, Ops, Safety, Select, SelectCase, Span, Spec, TableRef, UpdateCase,
-    Writes,
+    Identity, Ignore, InsertCase, Lint, Ops, Safety, Select, SelectCase, Span, Spec, TableRef,
+    UpdateCase, Writes,
 };
+use crate::lint::{Key, Rule};
 
 const SUPPORTED_VERSION: u32 = 1;
 const WILDCARD: &str = "*";
@@ -96,6 +98,8 @@ pub fn resolve(
         }
     }
 
+    let lint = r.lint(raw.lint, &known);
+
     if r.diagnostics.is_empty() {
         let config = Config {
             database,
@@ -105,6 +109,7 @@ pub fn resolve(
             unspecified: raw.unspecified,
             defaults,
             expect,
+            lint,
         };
         Ok((config, extensions))
     } else {
@@ -318,6 +323,87 @@ impl Resolver<'_> {
                 ),
             );
         }
+    }
+
+    fn lint(&mut self, raw: RawLint, known: &HashSet<String>) -> Lint {
+        let ignore = raw
+            .ignore
+            .into_iter()
+            .filter_map(|entry| self.ignore(entry, known))
+            .collect();
+        Lint { ignore }
+    }
+
+    fn ignore(&mut self, entry: Spanned<RawIgnore>, known: &HashSet<String>) -> Option<Ignore> {
+        let at = span(&entry);
+        let raw = entry.value;
+        let rule = Rule::from_id(&raw.rule.value);
+        if rule.is_none() {
+            let (first, last) = (Rule::ALL[0], Rule::ALL[Rule::ALL.len() - 1]);
+            self.error(
+                span(&raw.rule),
+                format!(
+                    "unknown rule `{}`; expected {first} to {last}",
+                    raw.rule.value
+                ),
+            );
+        }
+        let reason = match &raw.reason {
+            None => {
+                self.error(
+                    at,
+                    "ignore entry needs a `reason` saying why the finding is acceptable".into(),
+                );
+                String::new()
+            }
+            Some(reason) if reason.value.trim().is_empty() => {
+                self.error(span(reason), "`reason` is empty".into());
+                String::new()
+            }
+            Some(reason) => reason.value.clone(),
+        };
+        if let Some(identity) = &raw.identity {
+            self.check_identity(identity, known);
+        }
+        let keys = [
+            (Key::Table, &raw.table),
+            (Key::Identity, &raw.identity),
+            (Key::Function, &raw.function),
+            (Key::View, &raw.view),
+        ];
+        for (key, value) in keys {
+            let Some(value) = value else { continue };
+            if value.value.trim().is_empty() {
+                self.error(span(value), format!("`{}` is empty", key.as_str()));
+            }
+            if let Some(rule) = rule
+                && !rule.keys().contains(&key)
+            {
+                let takes: Vec<String> = rule
+                    .keys()
+                    .iter()
+                    .map(|k| format!("`{}`", k.as_str()))
+                    .collect();
+                self.error(
+                    span(value),
+                    format!(
+                        "{rule} findings have no `{}`; match them on {}",
+                        key.as_str(),
+                        takes.join(" or ")
+                    ),
+                );
+            }
+        }
+        let value = |v: Option<Spanned<String>>| v.map(|v| v.value);
+        Some(Ignore {
+            rule: rule?,
+            table: value(raw.table),
+            identity: value(raw.identity),
+            function: value(raw.function),
+            view: value(raw.view),
+            reason,
+            span: at,
+        })
     }
 
     fn block(

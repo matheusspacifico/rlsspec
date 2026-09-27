@@ -313,4 +313,36 @@ Config {
             },
         },
     ],
+    lint: Lint {
+        ignore: [
+            Ignore {
+                rule: Rls006,
+                table: Some(
+                    "audit_log",
+                ),
+                identity: None,
+                function: None,
+                view: None,
+                reason: "write-only through a SECURITY DEFINER function",
+                span: Span {
+                    line: 35,
+                    column: 7,
+                },
+            },
+            Ignore {
+                rule: Rls008,
+                table: None,
+                identity: Some(
+                    "public_web",
+                ),
+                function: None,
+                view: None,
+                reason: "grants managed elsewhere",
+                span: Span {
+                    line: 36,
+                    column: 7,
+                },
+            },
+        ],
+    },
 }
