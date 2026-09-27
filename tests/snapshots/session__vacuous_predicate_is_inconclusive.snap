@@ -1,0 +1,7 @@
+---
+source: tests/session.rs
+expression: out.stdout
+---
+notes
+  ? alice  select  rows: id > 100  vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/session/vacuous.yaml:11:15)
+0 failed · 0 passed · 1 inconclusive

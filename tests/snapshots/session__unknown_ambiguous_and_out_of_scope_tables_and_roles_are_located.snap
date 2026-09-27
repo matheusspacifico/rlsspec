@@ -1,0 +1,29 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: cannot act as identity `ghost`: role "nobody_here" does not exist (SQLSTATE 22023)
+ --> tests/fixtures/session/tables.yaml:8:18
+  |
+8 |   ghost: { role: nobody_here }
+  |                  ^
+
+error: table `notes` is ambiguous: it exists in schemas public, app; write `public.notes`
+  --> tests/fixtures/session/tables.yaml:10:3
+   |
+10 |   notes:
+   |   ^
+
+error: schema `archive` is not listed in `database.schemas`
+  --> tests/fixtures/session/tables.yaml:14:3
+   |
+14 |   archive.notes:
+   |   ^
+
+error: table `nope` not found in schemas public, app
+  --> tests/fixtures/session/tables.yaml:16:3
+   |
+16 |   nope:
+   |   ^
+
+error: could not load tests/fixtures/session/tables.yaml (4 errors)

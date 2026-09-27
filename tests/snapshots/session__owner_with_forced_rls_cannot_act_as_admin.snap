@@ -1,0 +1,5 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: database.url role must be superuser, have BYPASSRLS, or own the tables without FORCE (reading "public"."notes" with row_security = off failed: query would be affected by row-level security policy for table "notes" (SQLSTATE 42501))

@@ -1,0 +1,7 @@
+---
+source: tests/select.rs
+expression: "run(\"rows_pass\", 0)"
+---
+notes
+  ✓ alice  select  rows: tenant_id = '…000a'  3 visible
+0 failed · 1 passed · 0 inconclusive

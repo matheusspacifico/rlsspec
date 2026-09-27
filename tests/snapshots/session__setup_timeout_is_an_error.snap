@@ -1,0 +1,5 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: setup file tests/fixtures/session/sleep.sql failed: canceling statement due to statement timeout (SQLSTATE 57014)

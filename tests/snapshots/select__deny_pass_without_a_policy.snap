@@ -1,0 +1,7 @@
+---
+source: tests/select.rs
+expression: "run(\"deny_no_policy\", 0)"
+---
+notes
+  ✓ guest  select  deny  0 visible
+0 failed · 1 passed · 0 inconclusive

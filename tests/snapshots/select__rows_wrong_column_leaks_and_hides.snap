@@ -1,0 +1,7 @@
+---
+source: tests/select.rs
+expression: "run(\"rows_wrong_column\", 1)"
+---
+notes
+  ✗ alice  select  rows: tenant_id = '…000a'  leaked 1 of 3 rows: id=6 · hidden 1 of 3 rows: id=2
+1 failed · 0 passed · 0 inconclusive

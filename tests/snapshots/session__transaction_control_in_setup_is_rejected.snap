@@ -1,0 +1,11 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: `COMMIT` is not allowed in setup files: rlsspec runs everything in one transaction that is always rolled back
+ --> tests/fixtures/session/commit.sql:3:12
+  |
+3 | /* done */ COMMIT;
+  |            ^
+
+error: could not load tests/fixtures/session/commit.sql (1 error)

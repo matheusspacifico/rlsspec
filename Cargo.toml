@@ -18,3 +18,4 @@ postgres = "0.19"
 
 [dev-dependencies]
 insta = "1.48"
+testcontainers-modules = { version = "0.15.0", features = ["postgres", "blocking"] }

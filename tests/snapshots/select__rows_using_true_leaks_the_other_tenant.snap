@@ -1,0 +1,7 @@
+---
+source: tests/select.rs
+expression: "run(\"rows_using_true\", 1)"
+---
+notes
+  ✗ alice  select  rows: tenant_id = '…000a'  leaked 3 of 3 rows: id=4, id=5, id=6
+1 failed · 0 passed · 0 inconclusive

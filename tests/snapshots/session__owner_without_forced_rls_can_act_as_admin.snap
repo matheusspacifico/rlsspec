@@ -1,0 +1,7 @@
+---
+source: tests/session.rs
+expression: out.stdout
+---
+notes
+  ✓ alice  select  rows: tenant_id = '…000a'  3 visible
+0 failed · 1 passed · 0 inconclusive

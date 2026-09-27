@@ -1,0 +1,7 @@
+---
+source: tests/select.rs
+expression: "run(\"rows_permissive_widens\", 1)"
+---
+notes
+  ✗ alice  select  rows: tenant_id = '…000a'  leaked 1 of 3 rows: id=4
+1 failed · 0 passed · 0 inconclusive
