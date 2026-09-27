@@ -69,8 +69,14 @@ fn allow_remote_passes_the_safety_guard() {
 }
 
 #[test]
-fn test_on_valid_config_reaches_the_runner() {
+fn test_on_unreachable_database_is_a_connection_error() {
     let out = rlsspec(&["test", "-c", "tests/fixtures/cli/valid.yaml"]);
     assert_eq!(out.code, Some(2));
-    assert_eq!(out.stderr, "error: running cases is not implemented yet\n");
+    assert!(
+        out.stderr
+            .starts_with("error: cannot connect to the database: "),
+        "{}",
+        out.stderr
+    );
+    assert!(!out.stderr.contains("postgres://"), "{}", out.stderr);
 }

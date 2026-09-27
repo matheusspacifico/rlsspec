@@ -4,7 +4,9 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rlsspec::config::{self, ConfigError};
-use rlsspec::safety;
+use rlsspec::pg::PgError;
+use rlsspec::runner::{self, RunError};
+use rlsspec::{report, safety};
 
 const EXIT_ERROR: u8 = 2;
 
@@ -39,9 +41,9 @@ fn main() -> ExitCode {
     match run(&cli) {
         Ok(code) => code,
         Err(err) => {
-            match err.downcast_ref::<ConfigError>() {
-                Some(invalid @ ConfigError::Invalid { .. }) => eprint!("{invalid}"),
-                _ => eprintln!("error: {err:#}"),
+            match located(&err) {
+                Some(invalid) => eprint!("{invalid}"),
+                None => eprintln!("error: {err:#}"),
             }
             ExitCode::from(EXIT_ERROR)
         }
@@ -59,12 +61,22 @@ fn run(cli: &Cli) -> Result<ExitCode> {
 }
 
 fn test(cli: &Cli) -> Result<ExitCode> {
-    let (config, _source) = config::load(&cli.config)?;
+    let (config, source) = config::load(&cli.config)?;
     safety::check(
         &config.database.url,
         &config.safety.allowed_hosts,
         cli.allow_remote,
     )?;
-    eprintln!("error: running cases is not implemented yet");
-    Ok(ExitCode::from(EXIT_ERROR))
+    let report = runner::run(&config, &source)?;
+    print!("{}", report::text::render(&report));
+    Ok(ExitCode::from(report.exit_code()))
+}
+
+fn located(err: &anyhow::Error) -> Option<&ConfigError> {
+    let invalid = match err.downcast_ref::<RunError>() {
+        Some(RunError::Config(invalid))
+        | Some(RunError::Pg(PgError::SetupTransactionControl(invalid))) => invalid,
+        _ => err.downcast_ref::<ConfigError>()?,
+    };
+    matches!(invalid, ConfigError::Invalid { .. }).then_some(invalid)
 }

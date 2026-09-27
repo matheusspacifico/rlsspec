@@ -13,11 +13,11 @@ const MIN_SERVER_VERSION: i32 = 140000;
 #[derive(Debug, thiserror::Error)]
 pub enum PgError {
     #[error("cannot connect to the database: {}", describe(.0))]
-    Connect(#[source] postgres::Error),
+    Connect(postgres::Error),
     #[error("PostgreSQL {0} is not supported; rlsspec needs PostgreSQL 14 or later")]
     UnsupportedVersion(String),
     #[error("database error: {}", describe(.0))]
-    Query(#[from] postgres::Error),
+    Query(postgres::Error),
     #[error("cannot read setup file {}", path.display())]
     SetupRead {
         path: PathBuf,
@@ -28,6 +28,12 @@ pub enum PgError {
     SetupTransactionControl(ConfigError),
     #[error("setup file {} failed: {detail}", path.display())]
     Setup { path: PathBuf, detail: String },
+}
+
+impl From<postgres::Error> for PgError {
+    fn from(err: postgres::Error) -> Self {
+        Self::Query(err)
+    }
 }
 
 pub fn connect(url: &str) -> Result<Client, PgError> {
