@@ -6,7 +6,7 @@ All notable changes to rlsspec are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.1.1] - Unreleased
+## [0.1.1] - 2026-09-27
 
 A correctness and polish release, from running v0.1.0 against two real projects. No new spec key.
 
