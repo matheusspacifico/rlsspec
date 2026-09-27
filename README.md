@@ -2,6 +2,8 @@
 
 **Write down who should see what. `rlsspec` proves your Postgres Row Level Security does exactly that.**
 
+![rlsspec test passing, then failing on one delete case after a broken policy, then the JUnit report](https://raw.githubusercontent.com/matheusspacifico/rlsspec/main/docs/demo.gif)
+
 ---
 
 Row Level Security moves authorization into the database, where a missing `WHERE` can't leak data.
@@ -48,12 +50,7 @@ coverage 8/8 cells (100.0%) · 0 unspecified (warn)
 1 failed · 5 passed · 0 inconclusive
 ```
 
-> **Status: early development.** The checks below work today; there is no release yet, so you build it from
-> source. Expect the spec format to change before v0.1.
-
 ## Features
-
-Working now:
 
 - **Intent-based checks** for `SELECT`, `INSERT`, `UPDATE` and `DELETE`, run as each identity against a real
   database. Reports rows that *leaked*, rows that were wrongly *hidden*, and partial writes
@@ -72,30 +69,134 @@ Working now:
 - **`rlsspec lint`** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`,
   unsafe `SECURITY DEFINER` functions, views that bypass RLS, grants nobody should use (see [Lint](#lint)).
 - **CI-friendly**: exit codes `0` all good, `1` failures or lint errors, `2` config/connection errors or
-  inconclusive cases; `--format json` and `--format junit` reports (see [Output formats](#output-formats)).
+  inconclusive cases; `--format json` and `--format junit` reports (see the [output reference](https://github.com/matheusspacifico/rlsspec/blob/main/docs/output.md)); a
+  [GitHub Action](#github-action).
 - **TLS** with libpq's `sslmode`, required for any non-local host (see [Safety](#safety)).
+- **One static binary** for Linux, macOS and Windows: installers, Homebrew, `cargo install`, a Docker image
+  (see [Install](#install)).
 
-Planned for v0.1:
+## Install
 
-- Prebuilt binaries, a GitHub Action.
+**Shell installer** (Linux, macOS):
+
+```console
+$ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/matheusspacifico/rlsspec/releases/latest/download/rlsspec-installer.sh | sh
+```
+
+**PowerShell installer** (Windows):
+
+```console
+PS> powershell -ExecutionPolicy Bypass -c "irm https://github.com/matheusspacifico/rlsspec/releases/latest/download/rlsspec-installer.ps1 | iex"
+```
+
+The installers put `rlsspec` in `~/.cargo/bin` (or `$CARGO_HOME/bin`) and add it to your `PATH`. To pin a
+release, replace `latest/download` with `download/v0.1.0`.
+
+**Homebrew** (macOS, Linux):
+
+```console
+$ brew install matheusspacifico/tap/rlsspec
+```
+
+**Cargo** (Rust 1.89 or later):
+
+```console
+$ cargo install rlsspec --locked
+```
+
+**Archives**: every [release](https://github.com/matheusspacifico/rlsspec/releases) has a `.tar.xz` (Linux x86_64 and arm64, statically linked;
+macOS Intel and Apple silicon) or `.zip` (Windows x86_64), each with its `.sha256`.
+
+Then check it runs: `rlsspec version`.
+
+### Docker
+
+```console
+$ docker run --rm --network host -v "$PWD":/work -e DATABASE_URL ghcr.io/matheusspacifico/rlsspec:0.1.0 test
+```
+
+The image (`linux/amd64`, `linux/arm64`) is distroless with the static binary as its entrypoint, runs as a
+non-root user and works in `/work`: mount the directory holding `rlsspec.yaml` and its `setup` files there
+(readable by any user). Tags: `0.1.0`, …, and `latest`.
+
+The [safety guard](#safety) sees hosts from inside the container:
+
+- **`--network host` with `localhost`** (Linux; recommended): the container shares the host's network, so
+  `localhost` is local and nothing else is needed. The example above works this way.
+- **`host.docker.internal`, or a compose service name** (`db`): that's a non-local host. It must be listed in
+  `safety.allowed_hosts` (or passed with `--allow-remote`) **and** use TLS, since `sslmode=prefer` becomes
+  `require`. A local Postgres without TLS also needs `--allow-insecure`, which prints a warning:
+
+  ```console
+  $ docker run --rm -v "$PWD":/work \
+      -e DATABASE_URL=postgres://postgres:postgres@host.docker.internal:54329/postgres \
+      ghcr.io/matheusspacifico/rlsspec:0.1.0 lint --allow-remote --allow-insecure
+  warning: connecting to non-local host `host.docker.internal` (--allow-remote)
+  warning: connecting to non-local host `host.docker.internal` without TLS if it doesn't offer it (sslmode=prefer, --allow-insecure)
+  0 errors · 0 warnings · 0 info · 0 ignored
+  ```
+
+  On Linux without Docker Desktop, add `--add-host=host.docker.internal:host-gateway`. If the error reads
+  `Network unreachable`, the name also resolved to an IPv6 address the container can't reach, which hides the
+  real reason: add `?hostaddr=<its IPv4 address>` to the URL to see it.
+
+For a server with a private CA, mount the CA and point at it: `?sslmode=verify-full&sslrootcert=/work/ca.pem`,
+or `-e SSL_CERT_FILE=/work/ca.pem` to add it to the trusted roots.
+
+### GitHub Action
+
+```yaml
+jobs:
+  rls:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - run: psql "$DATABASE_URL" -f db/schema.sql -f db/policies.sql   # your migrations
+      - uses: matheusspacifico/rlsspec@v0.1.0
+        with:
+          format: junit
+          output: rlsspec.xml
+      - uses: mikepenz/action-junit-report@v6
+        if: always()   # also when rlsspec failed, to show which cases
+        with:
+          report_paths: rlsspec.xml
+```
+
+| Input | Default | |
+|---|---|---|
+| `version` | the action's tag | Release to run (`0.1.0`). Required when you pin the action to a commit SHA |
+| `command` | `test` | `test`, `lint` or `cover` |
+| `config` | `rlsspec.yaml` | Spec file |
+| `format` | `text` | `text`, `json` or `junit` |
+| `output` | | Write the report to this file (text is also shown in the log) |
+| `args` | | Extra arguments, e.g. `--allow-remote` |
+
+The action downloads that release's binary for the runner, checks it against the release's sha256 and runs it.
+The step fails when rlsspec exits non-zero, after writing `output`; the `exit-code` output has the code. It
+runs on Linux and macOS runners, and `DATABASE_URL` comes from your job's `env` (never printed).
+
+A job like the one above reaches its service on `localhost`, which is local. A job that runs in a `container:`
+reaches the service by its name (`postgres`), a non-local host: allow it and use TLS, as for
+[Docker](#docker).
 
 ## Getting started
 
 ### Requirements
 
-- **Rust** (stable) to build it: install with [rustup](https://rustup.rs).
 - **PostgreSQL 14 or later**, reachable from where you run it. Use a local, CI or disposable database (see
   [Safety](#safety)).
 - A **privileged connection**: the `database.url` role must be a superuser, have `BYPASSRLS`, or own the
   tables without `FORCE ROW LEVEL SECURITY`, and must be able to `SET ROLE` to every identity's role.
 - **Docker**, only to run the example or the project's own tests.
-
-### Install
-
-```console
-$ cargo install --git https://github.com/matheusspacifico/rlsspec
-$ rlsspec version
-```
 
 ### Try the example
 
@@ -144,6 +245,12 @@ expect:                           # table → identity → operations
 
 Then run `rlsspec test`. The rows your checks need must exist: put them in the database beforehand or in
 `setup` files (a check against an empty table is reported as an error, never a pass).
+
+**`version: 1` is stable.** From v0.1.0, a spec that runs on this release keeps running, with the same
+meaning, on later releases. New features only add optional keys; an older rlsspec rejects keys it doesn't
+know, so upgrade before using them. A change that would break a spec or change what it checks would come
+with a new `version`, and a release that can't read your spec's version says so instead of guessing. Lint may
+gain rules, so `rlsspec lint` can report findings it didn't before.
 
 | Form | Passes when |
 |---|---|
@@ -235,7 +342,7 @@ nothing is reported as a stale ignore, so ignores can't outlive what they excuse
 report). JSON and JUnit go to stdout without colour, and the exit code is the same whatever the format.
 Config and connection errors are always plain text on stderr, with nothing on stdout.
 
-- **JSON**: one document per run, starting with `"schema_version": 1` and ending with `"exit_code"`. `test`
+- **JSON**: one document per run, starting with `"schema_version": 1` (frozen since v0.1.0) and ending with `"exit_code"`. `test`
   lists every case (`table`, `identity`, `op`, `origin`, `description`, `outcome`, `detail` and its
   `location` in the spec), the coverage with its gaps, and the totals; `cover` the matrix; `lint` the findings,
   the ignored count and the skipped rules. A breaking change to the format bumps `schema_version`.
@@ -247,6 +354,8 @@ Config and connection errors are always plain text on stderr, with nothing on st
 ```console
 $ rlsspec test --format junit > rlsspec.xml
 ```
+
+Every field, the JUnit mapping and the exit codes are in the [output reference](https://github.com/matheusspacifico/rlsspec/blob/main/docs/output.md).
 
 Commands: `test`, `cover`, `lint`, `init`, `version`. Useful flags: `-c/--config <file>`, `--format`,
 `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`), `--allow-insecure` (a non-local

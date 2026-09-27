@@ -233,7 +233,7 @@ keep the exit code:
 
 ```yaml
 - run: rlsspec test --format junit > rlsspec.xml
-- uses: mikepenz/action-junit-report@v5
+- uses: mikepenz/action-junit-report@v6
   if: always()
   with:
     report_paths: rlsspec.xml
