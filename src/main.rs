@@ -4,6 +4,7 @@ use std::process::ExitCode;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rlsspec::config::{self, ConfigError};
+use rlsspec::safety;
 
 const EXIT_ERROR: u8 = 2;
 
@@ -16,6 +17,10 @@ const EXIT_ERROR: u8 = 2;
 struct Cli {
     #[arg(short, long, global = true, default_value = "rlsspec.yaml")]
     config: PathBuf,
+
+    /// Allow connecting to hosts outside localhost and `safety.allowed_hosts`
+    #[arg(long, global = true)]
+    allow_remote: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -54,7 +59,12 @@ fn run(cli: &Cli) -> Result<ExitCode> {
 }
 
 fn test(cli: &Cli) -> Result<ExitCode> {
-    config::load(&cli.config)?;
+    let config = config::load(&cli.config)?;
+    safety::check(
+        &config.database.url,
+        &config.allowed_hosts,
+        cli.allow_remote,
+    )?;
     eprintln!("error: running cases is not implemented yet");
     Ok(ExitCode::from(EXIT_ERROR))
 }
