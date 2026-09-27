@@ -1,0 +1,11 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: setup statement 2 failed: syntax error at or near "," (SQLSTATE 42601)
+ --> tests/fixtures/session/syntax_error.sql:3:86
+  |
+3 | insert into notes (id, tenant_id) values (1, '00000000-0000-4000-8000-00000000000a'),,
+  |                                                                                      ^
+
+error: stopped before running any case (1 error in tests/fixtures/session/syntax_error.sql)

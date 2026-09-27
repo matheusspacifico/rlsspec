@@ -5,10 +5,10 @@ mod tls;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use postgres::error::SqlState;
+use postgres::error::{ErrorPosition, SqlState};
 use postgres::{Client, IsolationLevel, Transaction};
 
-use crate::config::{ConfigError, Safety, Source};
+use crate::config::{ConfigError, Diagnostic, Safety, Source};
 pub use target::{SslMode, Target, TargetError};
 pub use tls::TlsError;
 
@@ -30,8 +30,9 @@ pub enum PgError {
         #[source]
         source: io::Error,
     },
+    /// Transaction control in a setup file, or a failing setup statement, located in the file.
     #[error(transparent)]
-    SetupTransactionControl(ConfigError),
+    SetupLocated(ConfigError),
     #[error("setup file {} failed: {detail}", path.display())]
     Setup { path: PathBuf, detail: String },
 }
@@ -97,20 +98,56 @@ impl<'a> Session<'a> {
                     path: path.clone(),
                     source,
                 },
-                other => PgError::SetupTransactionControl(other),
+                other => PgError::SetupLocated(other),
             })?;
             let found = script::transaction_control(&source.text);
             if !found.is_empty() {
-                return Err(PgError::SetupTransactionControl(source.invalid(found)));
+                return Err(PgError::SetupLocated(source.invalid(found)));
             }
-            self.tx
-                .batch_execute(&source.text)
-                .map_err(|err| setup_failed(path, &err))?;
+            self.tx.batch_execute("SAVEPOINT rlsspec_setup")?;
+            match self.tx.batch_execute(&source.text) {
+                Ok(()) => self.tx.batch_execute("RELEASE SAVEPOINT rlsspec_setup")?,
+                Err(err) => {
+                    self.tx
+                        .batch_execute("ROLLBACK TO SAVEPOINT rlsspec_setup")?;
+                    return Err(self.locate_setup_error(&source, &err)?);
+                }
+            }
         }
         // A setup file may have switched role or loosened the session settings.
         self.tx.execute("RESET ROLE", &[])?;
         self.harden()?;
         Ok(())
+    }
+
+    /// Replays a failed setup file statement by statement to find the one that fails. The whole-file
+    /// error stands when the replay fails differently (or not at all), located by its position if any.
+    fn locate_setup_error(
+        &mut self,
+        source: &Source,
+        err: &postgres::Error,
+    ) -> Result<PgError, postgres::Error> {
+        for (i, range) in script::statements(&source.text).into_iter().enumerate() {
+            let Err(again) = self.tx.batch_execute(&source.text[range.clone()]) else {
+                continue;
+            };
+            if again.code() != err.code() {
+                break;
+            }
+            let at = error_offset(&source.text[range.clone()], &again)
+                .map_or(range.start, |o| range.start + o);
+            return Ok(located(
+                source,
+                at,
+                format!("setup statement {} failed: {}", i + 1, describe(&again)),
+            ));
+        }
+        self.tx
+            .batch_execute("ROLLBACK TO SAVEPOINT rlsspec_setup")?;
+        Ok(match error_offset(&source.text, err) {
+            Some(at) => located(source, at, format!("setup failed: {}", describe(err))),
+            None => setup_failed(&source.path, err),
+        })
     }
 
     pub fn tx(&mut self) -> &mut Transaction<'a> {
@@ -128,6 +165,20 @@ impl<'a> Session<'a> {
     pub fn rollback(self) -> Result<(), postgres::Error> {
         self.tx.rollback()
     }
+}
+
+fn located(source: &Source, at: usize, message: String) -> PgError {
+    let span = script::span_at(&source.text, at);
+    PgError::SetupLocated(source.invalid(vec![Diagnostic { span, message }]))
+}
+
+/// The byte offset in `sql` of the error's position, when Postgres reports one in the text it was sent.
+fn error_offset(sql: &str, err: &postgres::Error) -> Option<usize> {
+    let Some(ErrorPosition::Original(position)) = err.as_db_error()?.position() else {
+        return None;
+    };
+    let index = usize::try_from(*position).ok()?.checked_sub(1)?;
+    sql.char_indices().nth(index).map(|(at, _)| at)
 }
 
 fn setup_failed(path: &Path, err: &postgres::Error) -> PgError {

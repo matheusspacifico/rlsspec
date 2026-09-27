@@ -2,4 +2,10 @@
 source: tests/session.rs
 expression: out.stderr
 ---
-error: setup file tests/fixtures/session/sleep.sql failed: canceling statement due to statement timeout (SQLSTATE 57014)
+error: setup statement 1 failed: canceling statement due to statement timeout (SQLSTATE 57014)
+ --> tests/fixtures/session/sleep.sql:1:1
+  |
+1 | select pg_sleep(5);
+  | ^
+
+error: stopped before running any case (1 error in tests/fixtures/session/sleep.sql)

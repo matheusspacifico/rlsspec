@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::config::{Diagnostic, Span};
 
 const FORBIDDEN: [&str; 8] = [
@@ -14,19 +16,43 @@ const FORBIDDEN: [&str; 8] = [
 /// Finds top-level transaction control statements in a multi-statement SQL script.
 /// Strings, quoted identifiers, comments and dollar-quoted bodies are skipped.
 pub fn transaction_control(sql: &str) -> Vec<Diagnostic> {
+    scan(sql).diagnostics
+}
+
+/// The byte ranges of the top-level statements of a script, each from its first token to its `;`.
+pub fn statements(sql: &str) -> Vec<Range<usize>> {
+    scan(sql).statements
+}
+
+/// The 1-based line and column (in characters) of byte offset `at`.
+pub fn span_at(sql: &str, at: usize) -> Span {
+    let before = &sql[..at];
+    let line_start = before.rfind('\n').map_or(0, |i| i + 1);
+    Span {
+        line: before.matches('\n').count() + 1,
+        column: before[line_start..].chars().count() + 1,
+    }
+}
+
+fn scan(sql: &str) -> Scanner<'_> {
     let mut scanner = Scanner {
         sql,
         bytes: sql.as_bytes(),
         pos: 0,
         diagnostics: Vec::new(),
+        statements: Vec::new(),
         statement: Statement::default(),
     };
     scanner.run();
-    scanner.diagnostics
+    if let Some(start) = scanner.statement.start {
+        scanner.statements.push(start..sql.len());
+    }
+    scanner
 }
 
 #[derive(Default)]
 struct Statement {
+    start: Option<usize>,
     words: Vec<(String, usize)>,
     started: bool,
     routine: bool,
@@ -38,12 +64,17 @@ struct Scanner<'a> {
     bytes: &'a [u8],
     pos: usize,
     diagnostics: Vec<Diagnostic>,
+    statements: Vec<Range<usize>>,
     statement: Statement,
 }
 
 impl Scanner<'_> {
     fn peek(&self, offset: usize) -> Option<u8> {
         self.bytes.get(self.pos + offset).copied()
+    }
+
+    fn mark(&mut self, at: usize) {
+        self.statement.start.get_or_insert(at);
     }
 
     fn run(&mut self) {
@@ -57,12 +88,16 @@ impl Scanner<'_> {
                 b';' => {
                     self.pos += 1;
                     if self.statement.depth == 0 {
+                        if let Some(start) = self.statement.start {
+                            self.statements.push(start..self.pos);
+                        }
                         self.statement = Statement::default();
                     }
                 }
                 c if c.is_ascii_whitespace() => self.pos += 1,
                 c if is_word_start(c) => self.word(),
                 _ => {
+                    self.mark(self.pos);
                     self.statement.started = true;
                     self.pos += 1;
                 }
@@ -98,6 +133,7 @@ impl Scanner<'_> {
     }
 
     fn string(&mut self, backslash_escapes: bool) {
+        self.mark(self.pos);
         self.statement.started = true;
         self.pos += 1;
         while let Some(c) = self.peek(0) {
@@ -112,6 +148,7 @@ impl Scanner<'_> {
     }
 
     fn quoted_identifier(&mut self) {
+        self.mark(self.pos);
         self.statement.started = true;
         self.pos += 1;
         while let Some(c) = self.peek(0) {
@@ -136,6 +173,7 @@ impl Scanner<'_> {
     }
 
     fn dollar_body(&mut self) {
+        self.mark(self.pos);
         self.statement.started = true;
         let Some(len) = self.dollar_tag() else {
             return;
@@ -150,6 +188,7 @@ impl Scanner<'_> {
 
     fn word(&mut self) {
         let start = self.pos;
+        self.mark(start);
         while self.peek(0).is_some_and(is_word_char) {
             self.pos += 1;
         }
@@ -195,14 +234,8 @@ impl Scanner<'_> {
     }
 
     fn report(&mut self, keyword: &str, at: usize) {
-        let before = &self.sql[..at];
-        let line_start = before.rfind('\n').map_or(0, |i| i + 1);
-        let span = Span {
-            line: before.matches('\n').count() + 1,
-            column: before[line_start..].chars().count() + 1,
-        };
         self.diagnostics.push(Diagnostic {
-            span,
+            span: span_at(self.sql, at),
             message: format!(
                 "`{keyword}` is not allowed in setup files: rlsspec runs everything in one transaction that is always rolled back"
             ),
@@ -311,6 +344,39 @@ mod tests {
             found("create procedure p() language sql begin atomic select 1; end;\ncommit;"),
             [(2, 1, "COMMIT".into())]
         );
+    }
+
+    fn split(sql: &str) -> Vec<&str> {
+        statements(sql).into_iter().map(|r| &sql[r]).collect()
+    }
+
+    #[test]
+    fn statements_are_split_at_top_level_semicolons() {
+        assert_eq!(
+            split("-- seed\ninsert into t values (';');\n\n/* x */ select 1;select 2"),
+            ["insert into t values (';');", "select 1;", "select 2"]
+        );
+        assert_eq!(
+            split(
+                "create function f() returns int language sql\nbegin atomic select 1; end;\ndo $$ begin null; end $$;"
+            ),
+            [
+                "create function f() returns int language sql\nbegin atomic select 1; end;",
+                "do $$ begin null; end $$;"
+            ]
+        );
+        assert_eq!(split("E'a;b'; \"x;\" ;"), ["E'a;b';", "\"x;\" ;"]);
+        assert_eq!(split(";; -- nothing\n"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn span_at_counts_characters() {
+        let sql = "select 'é';\n  x";
+        assert_eq!(
+            span_at(sql, sql.find('x').unwrap_or(0)),
+            Span { line: 2, column: 3 }
+        );
+        assert_eq!(span_at("é,", 2), Span { line: 1, column: 2 });
     }
 
     #[test]

@@ -71,3 +71,17 @@ fn owner_without_forced_rls_can_act_as_admin() {
     assert_eq!(out.code, Some(0), "{}{}", out.stdout, out.stderr);
     insta::assert_snapshot!(out.stdout);
 }
+
+#[test]
+fn setup_syntax_error_is_located_at_its_position() {
+    let out = failing("syntax_error");
+    assert_eq!(out.stdout, "");
+    insta::assert_snapshot!(out.stderr);
+}
+
+#[test]
+fn setup_constraint_error_names_the_failing_statement() {
+    let out = failing("duplicate_key");
+    assert_eq!(out.stdout, "");
+    insta::assert_snapshot!(out.stderr);
+}

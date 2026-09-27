@@ -221,8 +221,9 @@ fn guard(cli: &Cli, url: &str, allowed_hosts: &[String]) -> Result<Target> {
 
 fn located(err: &anyhow::Error) -> Option<&ConfigError> {
     let invalid = match err.downcast_ref::<RunError>() {
-        Some(RunError::Config(invalid))
-        | Some(RunError::Pg(PgError::SetupTransactionControl(invalid))) => invalid,
+        Some(RunError::Config(invalid)) | Some(RunError::Pg(PgError::SetupLocated(invalid))) => {
+            invalid
+        }
         _ => err.downcast_ref::<ConfigError>()?,
     };
     matches!(invalid, ConfigError::Invalid { .. }).then_some(invalid)

@@ -1,0 +1,8 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [syntax_error.sql]
+identities:
+  alice: { role: app }
+expect:
+  notes:
+    alice: { select: deny }

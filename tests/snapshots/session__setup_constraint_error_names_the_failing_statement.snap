@@ -1,0 +1,11 @@
+---
+source: tests/session.rs
+expression: out.stderr
+---
+error: setup statement 3 failed: duplicate key value violates unique constraint "notes_pkey" (SQLSTATE 23505)
+ --> tests/fixtures/session/duplicate_key.sql:4:25
+  |
+4 | /* the same id again */ insert into notes (id, tenant_id)
+  |                         ^
+
+error: stopped before running any case (1 error in tests/fixtures/session/duplicate_key.sql)
