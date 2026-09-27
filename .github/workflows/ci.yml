@@ -58,3 +58,23 @@ jobs:
       - run: ./target/debug/rlsspec test -c examples/multitenant/rlsspec.yaml
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
+
+  supabase:
+    name: supabase (preset + example)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The tests that need the supabase/postgres image are #[ignore]d so plain `cargo test` never pulls it.
+      - run: cargo test --locked --test supabase -- --ignored
+        env:
+          INSTA_UPDATE: "no"
+      - run: cargo build --locked
+      - run: docker compose -f examples/supabase-todo/docker-compose.yml up -d --wait
+      # `unspecified: fail` in the spec: a gap exits 1 like a failure, and any non-zero exit fails the job.
+      - run: |
+          ./target/debug/rlsspec test -c examples/supabase-todo/rlsspec.yaml
+          ./target/debug/rlsspec cover -c examples/supabase-todo/rlsspec.yaml
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54330/postgres
