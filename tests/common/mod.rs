@@ -101,6 +101,20 @@ impl Db {
         }
     }
 
+    /// Runs `sql` as the superuser, committed: for schemas that exist before rlsspec runs.
+    pub fn execute(&self, sql: &str) {
+        connect(&self.url("postgres", "postgres"))
+            .batch_execute(sql)
+            .unwrap();
+    }
+
+    pub fn count(&self, table: &str) -> i64 {
+        connect(&self.url("postgres", "postgres"))
+            .query_one(&format!("SELECT count(*) FROM {table}"), &[])
+            .unwrap()
+            .get(0)
+    }
+
     /// Relations left behind in the test database. Everything `setup` creates must be rolled back.
     pub fn leftover_tables(&self) -> Vec<String> {
         connect(&self.url("postgres", "postgres"))

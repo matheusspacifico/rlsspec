@@ -1,0 +1,148 @@
+# Who may do what in the project tracker. Every identity × table × operation is specified.
+version: 1
+
+database:
+  url: ${env:DATABASE_URL}
+  schemas: [public]
+
+setup:
+  - seed.sql
+
+vars:
+  acme: 0e5e0000-0000-4000-8000-00000000ac3e
+  globex: 0e5e0000-0000-4000-8000-0000000610be
+  ana: a5e40000-0000-4000-8000-000000000a0a       # Acme admin
+  ben: a5e40000-0000-4000-8000-000000000b0b       # Acme member
+  cleo: a5e40000-0000-4000-8000-000000000c0c      # Globex admin
+  newcomer: a5e40000-0000-4000-8000-000000000d0d  # not a member anywhere yet
+  acme_roadmap: 9a0e0000-0000-4000-8000-000000000002
+  globex_launch: 9a0e0000-0000-4000-8000-000000000003
+
+identities:
+  anon:
+    role: app_anon
+  ana:
+    role: app_user
+    gucs: { app.org_id: "${acme}", app.user_id: "${ana}" }
+  ben:
+    role: app_user
+    gucs: { app.org_id: "${acme}", app.user_id: "${ben}" }
+  cleo:
+    role: app_user
+    gucs: { app.org_id: "${globex}", app.user_id: "${cleo}" }
+
+defaults:
+  anon:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }
+  ana:
+    "*": { select: { rows: "org_id = ${acme}" } }
+    organizations: { select: { rows: "id = ${acme}" }, insert: deny, delete: deny }
+    memberships: { update: deny }
+  ben:
+    "*": { select: { rows: "org_id = ${acme}" } }
+    organizations: { select: { rows: "id = ${acme}" }, insert: deny, delete: deny }
+    memberships: { update: deny }
+  cleo:
+    "*": { select: { rows: "org_id = ${globex}" } }
+    organizations: { select: { rows: "id = ${globex}" }, insert: deny, delete: deny }
+    memberships: { update: deny }
+
+expect:
+  organizations:
+    ana:
+      update:                                   # admins rename their own organization only
+        - { where: "id = ${acme}", expect: allow }
+        - { where: "id = ${globex}", expect: deny }
+    ben:
+      update: deny                              # members can't rename it
+    cleo:
+      update:
+        - { where: "id = ${globex}", expect: allow }
+        - { where: "id = ${acme}", expect: deny }
+
+  memberships:
+    ana:
+      insert:
+        - { values: { org_id: "${acme}", user_id: "${newcomer}", role: member }, expect: allow }
+        - { values: { org_id: "${globex}", user_id: "${newcomer}", role: member }, expect: deny }
+      delete:
+        - { where: "org_id = ${acme} and user_id = ${ben}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+    ben:
+      insert:                                   # members can't invite
+        - { values: { org_id: "${acme}", user_id: "${newcomer}", role: member }, expect: deny }
+      delete: deny
+    cleo:
+      insert:
+        - { values: { org_id: "${globex}", user_id: "${newcomer}", role: admin }, expect: allow }
+        - { values: { org_id: "${acme}", user_id: "${newcomer}", role: admin }, expect: deny }
+      delete:
+        - { where: "org_id = ${globex}", expect: allow }
+        - { where: "org_id = ${acme}", expect: deny }
+
+  projects:
+    anon:
+      select: { rows: "is_public" }             # public projects of every organization
+    ana:
+      insert:
+        - { values: { org_id: "${acme}", name: "Hiring" }, expect: allow }
+        - { values: { org_id: "${globex}", name: "Hiring" }, expect: deny }
+      update:
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+        - { where: "org_id = ${acme}", set: { org_id: "${globex}" }, expect: deny }
+      delete:
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+    ben:
+      insert:
+        - { values: { org_id: "${acme}", name: "Hiring", is_public: true }, expect: allow }
+      update:
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+      delete:                                   # only admins delete projects
+        - { where: "org_id = ${acme}", expect: deny }
+    cleo:
+      insert:
+        - { values: { org_id: "${globex}", name: "Hiring" }, expect: allow }
+        - { values: { org_id: "${acme}", name: "Hiring" }, expect: deny }
+      update:
+        - { where: "org_id = ${globex}", expect: allow }
+        - { where: "org_id = ${acme}", expect: deny }
+      delete:
+        - { where: "org_id = ${globex}", expect: allow }
+        - { where: "org_id = ${acme}", expect: deny }
+
+  tasks:
+    ana:
+      insert:
+        - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ana}" }, expect: allow }
+        - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ben}" }, expect: deny }
+        - { values: { org_id: "${globex}", project_id: "${globex_launch}", title: "Plan", created_by: "${ana}" }, expect: deny }
+      update:
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+        - { where: "org_id = ${acme}", set: { org_id: "${globex}" }, expect: deny }
+      delete:                                   # admins delete any task of their organization
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+    ben:
+      insert:
+        - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ben}" }, expect: allow }
+        - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ana}" }, expect: deny }
+      update:
+        - { where: "org_id = ${acme}", expect: allow }
+        - { where: "org_id = ${globex}", expect: deny }
+      delete:                                   # members delete only their own tasks
+        - { where: "created_by = ${ben}", expect: allow }
+        - { where: "org_id = ${acme} and created_by <> ${ben}", expect: deny }
+    cleo:
+      insert:
+        - { values: { org_id: "${globex}", project_id: "${globex_launch}", title: "Plan", created_by: "${cleo}" }, expect: allow }
+        - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${cleo}" }, expect: deny }
+      update:
+        - { where: "org_id = ${globex}", expect: allow }
+        - { where: "org_id = ${acme}", expect: deny }
+      delete:
+        - { where: "org_id = ${globex}", expect: allow }
+        - { where: "org_id = ${acme}", expect: deny }

@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54329:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/1-schema.sql:ro
+      - ./policies.sql:/docker-entrypoint-initdb.d/2-policies.sql:ro
+    healthcheck:
+      # Over TCP: during initialisation the server only listens on its unix socket.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
