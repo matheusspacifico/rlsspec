@@ -88,8 +88,17 @@ impl Db {
     }
 
     pub fn run_with_url(&self, config: &str, database_url: &str) -> Output {
+        self.rlsspec_with_url(&["test", "-c", config], database_url)
+    }
+
+    /// Runs the binary with `args`, `DATABASE_URL` pointing at this database as the superuser.
+    pub fn rlsspec(&self, args: &[&str]) -> Output {
+        self.rlsspec_with_url(args, &self.url("postgres", "postgres"))
+    }
+
+    fn rlsspec_with_url(&self, args: &[&str], database_url: &str) -> Output {
         let output = Command::new(env!("CARGO_BIN_EXE_rlsspec"))
-            .args(["test", "-c", config])
+            .args(args)
             .env("DATABASE_URL", database_url)
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .output()

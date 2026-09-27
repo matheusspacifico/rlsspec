@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use rlsspec::config::{self, ConfigError};
+use rlsspec::config::{self, Config, ConfigError, Source};
 use rlsspec::pg::PgError;
 use rlsspec::runner::{self, RunError};
 use rlsspec::{report, safety, style};
@@ -36,6 +36,8 @@ struct Cli {
 enum Command {
     /// Run every case in the spec against the database
     Test,
+    /// Print which identity × table × operation cells have a case, without running any
+    Cover,
     /// Print the version
     Version,
 }
@@ -67,19 +69,32 @@ fn run(cli: &Cli) -> Result<ExitCode> {
             Ok(ExitCode::SUCCESS)
         }
         Command::Test => test(cli),
+        Command::Cover => cover(cli),
     }
 }
 
 fn test(cli: &Cli) -> Result<ExitCode> {
+    let (config, source) = load(cli)?;
+    let report = runner::run(&config, &source)?;
+    anstream::print!("{}", report::text::render(&report));
+    Ok(ExitCode::from(report.exit_code()))
+}
+
+fn cover(cli: &Cli) -> Result<ExitCode> {
+    let (config, source) = load(cli)?;
+    let coverage = runner::cover(&config, &source)?;
+    anstream::print!("{}", report::text::render_cover(&coverage));
+    Ok(ExitCode::from(u8::from(coverage.fails())))
+}
+
+fn load(cli: &Cli) -> Result<(Config, Source)> {
     let (config, source) = config::load(&cli.config)?;
     safety::check(
         &config.database.url,
         &config.safety.allowed_hosts,
         cli.allow_remote,
     )?;
-    let report = runner::run(&config, &source)?;
-    anstream::print!("{}", report::text::render(&report));
-    Ok(ExitCode::from(report.exit_code()))
+    Ok((config, source))
 }
 
 fn located(err: &anyhow::Error) -> Option<&ConfigError> {

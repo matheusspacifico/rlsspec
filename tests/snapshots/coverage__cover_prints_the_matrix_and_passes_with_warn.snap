@@ -1,0 +1,8 @@
+---
+source: tests/coverage.rs
+expression: "cover(\"warn\", 0).stdout"
+---
+       alice  guest
+notes  ·I·D   ····
+tags   ··UD   ····
+coverage 4/16 cells (25.0%) · 12 unspecified (warn)

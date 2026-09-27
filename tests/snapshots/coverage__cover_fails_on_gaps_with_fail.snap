@@ -1,0 +1,8 @@
+---
+source: tests/coverage.rs
+expression: "cover(\"fail_new_table\", 1).stdout"
+---
+       alice  guest
+notes  SIUD   SIUD
+tags   ····   SIUD
+coverage 12/16 cells (75.0%) · 4 unspecified (fail)

@@ -210,6 +210,60 @@ fn gap_style(policy: Unspecified) -> Style {
     }
 }
 
+/// The coverage matrix: one row per table, one column per identity, `SIUD` with `·` for gaps.
+pub fn render_cover(coverage: &Coverage) -> String {
+    const LETTERS: [char; 4] = ['S', 'I', 'U', 'D'];
+    let table_width = coverage
+        .tables
+        .iter()
+        .map(|t| t.table.chars().count())
+        .max();
+    let table_width = table_width.unwrap_or(0);
+    let widths: Vec<usize> = coverage
+        .identities
+        .iter()
+        .map(|i| i.chars().count().max(LETTERS.len()))
+        .collect();
+    let gap = match coverage.policy {
+        Unspecified::Ignore => style::MUTED,
+        policy => gap_style(policy),
+    };
+    let (header, muted) = (style::EMPHASIS, style::MUTED);
+
+    let pad = |i: usize, used: usize| {
+        let last = i + 1 == widths.len();
+        if last { 0 } else { widths[i] - used }
+    };
+
+    let mut out = " ".repeat(table_width);
+    for (i, identity) in coverage.identities.iter().enumerate() {
+        let used = identity.chars().count();
+        let _ = write!(
+            out,
+            "  {muted}{identity}{muted:#}{}",
+            " ".repeat(pad(i, used))
+        );
+    }
+    out.push('\n');
+    for table in &coverage.tables {
+        let _ = write!(out, "{header}{:<table_width$}{header:#}", table.table);
+        for (i, cells) in table.cells.iter().enumerate() {
+            out.push_str("  ");
+            for (letter, given) in LETTERS.iter().zip(cells) {
+                if *given {
+                    out.push(*letter);
+                } else {
+                    let _ = write!(out, "{gap}·{gap:#}");
+                }
+            }
+            out.push_str(&" ".repeat(pad(i, LETTERS.len())));
+        }
+        out.push('\n');
+    }
+    out.push_str(&coverage_line(coverage));
+    out
+}
+
 pub fn coverage_line(coverage: &Coverage) -> String {
     let (specified, total) = (coverage.specified(), coverage.total());
     let unspecified = coverage.unspecified();
@@ -326,6 +380,26 @@ coverage 0/0 cells · 0 unspecified (warn)
         assert_eq!(
             plain(&coverage_summary(&coverage(Unspecified::Ignore, cells))),
             "coverage 6/8 cells (75.0%) · 2 unspecified (ignore)\n"
+        );
+    }
+
+    #[test]
+    fn cover_matrix_marks_gaps() {
+        let mut coverage = coverage(Unspecified::Fail, [[true; 4], [true, false, false, true]]);
+        coverage.identities[0] = "anonymous".into();
+        coverage.tables.push(TableCoverage {
+            table: "organizations".into(),
+            cells: vec![[false; 4], [true; 4]],
+        });
+        let styled = render_cover(&coverage);
+        assert!(styled.contains('\x1b'), "{styled:?}");
+        assert_eq!(
+            plain(&styled),
+            "               anonymous  bob
+notes          SIUD       S··D
+organizations  ····       SIUD
+coverage 10/16 cells (62.5%) · 6 unspecified (fail)
+"
         );
     }
 

@@ -51,3 +51,12 @@ fn multitenant_example_catches_the_broken_delete_policy() {
     assert_eq!(failures.len(), 1, "{out}");
     insta::assert_snapshot!(out);
 }
+
+#[test]
+fn multitenant_example_is_fully_covered() {
+    let db = example_db(&[]);
+    let out = db.rlsspec(&["cover", "-c", &format!("{EXAMPLE}/rlsspec.yaml")]);
+    assert_eq!(out.code, Some(0), "{}", out.stderr);
+    assert_eq!(out.stderr, "");
+    insta::assert_snapshot!(out.stdout);
+}

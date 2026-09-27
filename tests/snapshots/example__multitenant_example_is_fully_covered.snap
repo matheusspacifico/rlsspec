@@ -1,0 +1,10 @@
+---
+source: tests/example.rs
+expression: out.stdout
+---
+               anon  ana   ben   cleo
+organizations  SIUD  SIUD  SIUD  SIUD
+memberships    SIUD  SIUD  SIUD  SIUD
+projects       SIUD  SIUD  SIUD  SIUD
+tasks          SIUD  SIUD  SIUD  SIUD
+coverage 64/64 cells (100.0%) · 0 unspecified (warn)
