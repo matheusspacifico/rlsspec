@@ -43,6 +43,8 @@ pub struct RawDatabase {
 pub struct RawSafety {
     #[serde(default)]
     pub allowed_hosts: Vec<String>,
+    pub lock_timeout: Option<Spanned<String>>,
+    pub statement_timeout: Option<Spanned<String>>,
 }
 
 #[derive(Debug, Deserialize)]

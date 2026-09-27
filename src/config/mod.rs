@@ -16,7 +16,7 @@ pub use diagnostic::{Diagnostic, Span};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     pub database: Database,
-    pub allowed_hosts: Vec<String>,
+    pub safety: Safety,
     pub setup: Vec<PathBuf>,
     pub identities: Vec<Identity>,
     pub unspecified: Unspecified,
@@ -31,10 +31,18 @@ pub struct Database {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Safety {
+    pub allowed_hosts: Vec<String>,
+    pub lock_timeout: String,
+    pub statement_timeout: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identity {
     pub name: String,
     pub role: String,
     pub gucs: Vec<(String, String)>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -55,6 +63,7 @@ pub enum TableRef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub table: TableRef,
+    pub table_span: Span,
     pub identity: String,
     pub ops: Ops,
     pub span: Span,
@@ -134,12 +143,37 @@ pub enum ConfigError {
     },
 }
 
-pub fn load(path: &Path) -> Result<Config, ConfigError> {
-    let text = fs::read_to_string(path).map_err(|source| ConfigError::Read {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    parse(&text, path, &|name| std::env::var(name).ok())
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Source {
+    pub path: PathBuf,
+    pub text: String,
+}
+
+impl Source {
+    pub fn read(path: &Path) -> Result<Self, ConfigError> {
+        let text = fs::read_to_string(path).map_err(|source| ConfigError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        Ok(Self {
+            path: path.to_path_buf(),
+            text,
+        })
+    }
+
+    pub fn invalid(&self, diagnostics: Vec<Diagnostic>) -> ConfigError {
+        ConfigError::Invalid {
+            path: self.path.clone(),
+            text: self.text.clone(),
+            diagnostics,
+        }
+    }
+}
+
+pub fn load(path: &Path) -> Result<(Config, Source), ConfigError> {
+    let source = Source::read(path)?;
+    let config = parse(&source.text, path, &|name| std::env::var(name).ok())?;
+    Ok((config, source))
 }
 
 pub fn parse(

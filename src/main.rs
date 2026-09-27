@@ -59,10 +59,10 @@ fn run(cli: &Cli) -> Result<ExitCode> {
 }
 
 fn test(cli: &Cli) -> Result<ExitCode> {
-    let config = config::load(&cli.config)?;
+    let (config, _source) = config::load(&cli.config)?;
     safety::check(
         &config.database.url,
-        &config.allowed_hosts,
+        &config.safety.allowed_hosts,
         cli.allow_remote,
     )?;
     eprintln!("error: running cases is not implemented yet");

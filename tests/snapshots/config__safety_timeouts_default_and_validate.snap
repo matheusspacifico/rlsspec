@@ -1,0 +1,17 @@
+---
+source: tests/config.rs
+expression: "errors(\"version: 1\\ndatabase: { url: postgres://localhost/db }\\nsafety:\\n  lock_timeout: 0s\\n  statement_timeout: 5 seconds\\nidentities:\\n  a: { role: app }\\n\")"
+---
+error: `safety.lock_timeout` must be a positive duration like `5s`, `500ms` or `2min`, found `0s`
+ --> rlsspec.yaml:4:17
+  |
+4 |   lock_timeout: 0s
+  |                 ^
+
+error: `safety.statement_timeout` must be a positive duration like `5s`, `500ms` or `2min`, found `5 seconds`
+ --> rlsspec.yaml:5:22
+  |
+5 |   statement_timeout: 5 seconds
+  |                      ^
+
+error: could not load rlsspec.yaml (2 errors)

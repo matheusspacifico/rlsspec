@@ -10,13 +10,21 @@ Config {
             "app",
         ],
     },
-    allowed_hosts: [],
+    safety: Safety {
+        allowed_hosts: [],
+        lock_timeout: "5s",
+        statement_timeout: "30s",
+    },
     setup: [],
     identities: [
         Identity {
             name: "public_web",
             role: "web_anon",
             gucs: [],
+            span: Span {
+                line: 12,
+                column: 11,
+            },
         },
         Identity {
             name: "alice",
@@ -31,12 +39,20 @@ Config {
                     "o'neil",
                 ),
             ],
+            span: Span {
+                line: 14,
+                column: 11,
+            },
         },
     ],
     unspecified: Fail,
     defaults: [
         Block {
             table: All,
+            table_span: Span {
+                line: 19,
+                column: 5,
+            },
             identity: "public_web",
             ops: Ops {
                 select: Some(
@@ -87,6 +103,10 @@ Config {
             table: Named(
                 "documents",
             ),
+            table_span: Span {
+                line: 21,
+                column: 3,
+            },
             identity: "alice",
             ops: Ops {
                 select: Some(
@@ -211,6 +231,10 @@ Config {
             table: Named(
                 "documents",
             ),
+            table_span: Span {
+                line: 21,
+                column: 3,
+            },
             identity: "public_web",
             ops: Ops {
                 select: Some(

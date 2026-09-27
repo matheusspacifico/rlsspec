@@ -172,3 +172,24 @@ fn setup_files_resolve_next_to_the_config() {
     .unwrap();
     assert_eq!(config.setup, [Path::new("tests/fixtures/seed.sql")]);
 }
+
+#[test]
+fn safety_timeouts_default_and_validate() {
+    let config = parse(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  a: { role: app }\n",
+    )
+    .unwrap();
+    assert_eq!(config.safety.lock_timeout, "5s");
+    assert_eq!(config.safety.statement_timeout, "30s");
+
+    let config = parse(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nsafety: { lock_timeout: 250ms, statement_timeout: 2min }\nidentities:\n  a: { role: app }\n",
+    )
+    .unwrap();
+    assert_eq!(config.safety.lock_timeout, "250ms");
+    assert_eq!(config.safety.statement_timeout, "2min");
+
+    insta::assert_snapshot!(errors(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nsafety:\n  lock_timeout: 0s\n  statement_timeout: 5 seconds\nidentities:\n  a: { role: app }\n"
+    ));
+}

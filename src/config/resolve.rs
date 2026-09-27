@@ -4,15 +4,20 @@ use std::path::Path;
 use serde_saphyr::Spanned;
 
 use super::map::SpannedMap;
-use super::raw::{RawConfig, RawDatabase, RawIdentity, RawOps, RawSelect, RawWrites, Value};
+use super::raw::{
+    RawConfig, RawDatabase, RawIdentity, RawOps, RawSafety, RawSelect, RawWrites, Value,
+};
 use super::vars::{self, Mode, Reference};
 use super::{
     Assignments, Block, Config, Database, DeleteCase, Diagnostic, Identity, InsertCase, Ops,
-    Select, SelectCase, Span, TableRef, UpdateCase, Writes,
+    Safety, Select, SelectCase, Span, TableRef, UpdateCase, Writes,
 };
 
 const SUPPORTED_VERSION: u32 = 1;
 const WILDCARD: &str = "*";
+const DEFAULT_LOCK_TIMEOUT: &str = "5s";
+const DEFAULT_STATEMENT_TIMEOUT: &str = "30s";
+const TIMEOUT_UNITS: [&str; 6] = ["us", "ms", "s", "min", "h", "d"];
 
 pub fn resolve(
     raw: RawConfig,
@@ -36,6 +41,7 @@ pub fn resolve(
     }
     r.load_vars(raw.vars);
     let database = r.database(raw.database);
+    let safety = r.safety(raw.safety);
     let setup = raw
         .setup
         .into_iter()
@@ -63,7 +69,8 @@ pub fn resolve(
             } else {
                 TableRef::Named(table.value.clone())
             };
-            defaults.push(r.block(table_ref, &identity.value, ops, span(&table)));
+            let at = span(&table);
+            defaults.push(r.block(table_ref, at, &identity.value, ops, at));
         }
     }
 
@@ -75,14 +82,20 @@ pub fn resolve(
         for (identity, ops) in by_identity {
             r.check_identity(&identity, &known);
             let table_ref = TableRef::Named(table.value.clone());
-            expect.push(r.block(table_ref, &identity.value, ops, span(&identity)));
+            expect.push(r.block(
+                table_ref,
+                span(&table),
+                &identity.value,
+                ops,
+                span(&identity),
+            ));
         }
     }
 
     if r.diagnostics.is_empty() {
         Ok(Config {
             database,
-            allowed_hosts: raw.safety.allowed_hosts,
+            safety,
             setup,
             identities,
             unspecified: raw.unspecified,
@@ -180,6 +193,33 @@ impl Resolver<'_> {
         Database { url, schemas }
     }
 
+    fn safety(&mut self, raw: RawSafety) -> Safety {
+        let mut timeout = |value: Option<Spanned<String>>, key: &str, default: &str| match value {
+            None => default.to_owned(),
+            Some(value) => {
+                if !is_timeout(&value.value) {
+                    self.error(
+                        span(&value),
+                        format!(
+                            "`safety.{key}` must be a positive duration like `5s`, `500ms` or `2min`, found `{}`",
+                            value.value
+                        ),
+                    );
+                }
+                value.value
+            }
+        };
+        Safety {
+            lock_timeout: timeout(raw.lock_timeout, "lock_timeout", DEFAULT_LOCK_TIMEOUT),
+            statement_timeout: timeout(
+                raw.statement_timeout,
+                "statement_timeout",
+                DEFAULT_STATEMENT_TIMEOUT,
+            ),
+            allowed_hosts: raw.allowed_hosts,
+        }
+    }
+
     fn identities(&mut self, raw: Spanned<SpannedMap<RawIdentity>>) -> Vec<Identity> {
         if raw.value.is_empty() {
             self.error(
@@ -209,6 +249,7 @@ impl Resolver<'_> {
                     .collect();
                 Identity {
                     name: name.value,
+                    span: span(&identity.role),
                     role: identity.role.value,
                     gucs,
                 }
@@ -228,7 +269,14 @@ impl Resolver<'_> {
         }
     }
 
-    fn block(&mut self, table: TableRef, identity: &str, raw: RawOps, at: Span) -> Block {
+    fn block(
+        &mut self,
+        table: TableRef,
+        table_span: Span,
+        identity: &str,
+        raw: RawOps,
+        at: Span,
+    ) -> Block {
         if raw.select.is_none()
             && raw.insert.is_none()
             && raw.update.is_none()
@@ -266,6 +314,7 @@ impl Resolver<'_> {
         };
         Block {
             table,
+            table_span,
             identity: identity.to_owned(),
             ops,
             span: at,
@@ -328,4 +377,10 @@ impl Resolver<'_> {
             })
             .collect()
     }
+}
+
+fn is_timeout(value: &str) -> bool {
+    let digits = value.bytes().take_while(u8::is_ascii_digit).count();
+    let (number, unit) = value.split_at(digits);
+    number.parse::<u64>().is_ok_and(|n| n > 0) && (unit.is_empty() || TIMEOUT_UNITS.contains(&unit))
 }
