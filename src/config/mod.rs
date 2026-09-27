@@ -37,6 +37,19 @@ pub struct Safety {
     pub statement_timeout: String,
 }
 
+pub const DEFAULT_LOCK_TIMEOUT: &str = "5s";
+pub const DEFAULT_STATEMENT_TIMEOUT: &str = "30s";
+
+impl Default for Safety {
+    fn default() -> Self {
+        Self {
+            allowed_hosts: Vec::new(),
+            lock_timeout: DEFAULT_LOCK_TIMEOUT.to_owned(),
+            statement_timeout: DEFAULT_STATEMENT_TIMEOUT.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identity {
     pub name: String,
@@ -71,10 +84,26 @@ pub struct Block {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Ops {
-    pub select: Option<SelectCase>,
-    pub insert: Option<Writes<InsertCase>>,
-    pub update: Option<Writes<UpdateCase>>,
-    pub delete: Option<Writes<DeleteCase>>,
+    pub select: Option<Spec<SelectCase>>,
+    pub insert: Option<Spec<Writes<InsertCase>>>,
+    pub update: Option<Spec<Writes<UpdateCase>>>,
+    pub delete: Option<Spec<Writes<DeleteCase>>>,
+}
+
+/// An operation is either `todo` (known, deliberately left unspecified) or given cases.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Spec<T> {
+    Todo,
+    Given(T),
+}
+
+impl<T> Spec<T> {
+    pub fn given(&self) -> Option<&T> {
+        match self {
+            Spec::Todo => None,
+            Spec::Given(value) => Some(value),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

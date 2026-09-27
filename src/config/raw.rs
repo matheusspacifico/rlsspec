@@ -66,6 +66,7 @@ pub struct RawOps {
 
 #[derive(Debug)]
 pub enum RawSelect {
+    Todo,
     Deny,
     All,
     Rows { rows: Spanned<String>, subset: bool },
@@ -87,11 +88,12 @@ impl<'de> Deserialize<'de> for RawSelect {
             type Value = RawSelect;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("`deny`, `all` or a mapping with `rows`")
+                f.write_str("`deny`, `all`, `todo` or a mapping with `rows`")
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<RawSelect, E> {
                 match v {
+                    "todo" => Ok(RawSelect::Todo),
                     "deny" => Ok(RawSelect::Deny),
                     "all" => Ok(RawSelect::All),
                     _ => Err(E::invalid_value(de::Unexpected::Str(v), &self)),
@@ -113,6 +115,7 @@ impl<'de> Deserialize<'de> for RawSelect {
 
 #[derive(Debug)]
 pub enum RawWrites<C> {
+    Todo,
     Shorthand(Expectation),
     Cases(Vec<Spanned<C>>),
 }
@@ -125,11 +128,12 @@ impl<'de, C: Deserialize<'de>> Deserialize<'de> for RawWrites<C> {
             type Value = RawWrites<C>;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("`allow`, `deny` or a list of cases")
+                f.write_str("`allow`, `deny`, `todo` or a list of cases")
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<RawWrites<C>, E> {
                 match v {
+                    "todo" => Ok(RawWrites::Todo),
                     "allow" => Ok(RawWrites::Shorthand(Expectation::Allow)),
                     "deny" => Ok(RawWrites::Shorthand(Expectation::Deny)),
                     _ => Err(E::invalid_value(de::Unexpected::Str(v), &self)),

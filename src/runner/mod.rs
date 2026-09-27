@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::catalog::{self, Catalog, Table};
 use crate::config::{
-    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, TableRef, Writes,
+    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, Spec, TableRef, Writes,
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session};
@@ -179,7 +179,7 @@ impl Cell<'_> {
 
     fn check(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
         let (table, identity) = (self.entry.table, self.entry.identity);
-        if let Some((case, origin)) = self.entry.select {
+        if let Some((Spec::Given(case), origin)) = self.entry.select {
             let at = self.at(case.span);
             let outcome =
                 session.case(|tx| select::check(tx, table, identity, &case.select, at))??;
@@ -193,13 +193,13 @@ impl Cell<'_> {
         }
         match self.entry.insert {
             // `insert: allow` is rejected when the config is loaded.
-            Some((Writes::Shorthand { expect, .. }, origin)) => {
+            Some((Spec::Given(Writes::Shorthand { expect, .. }), origin)) => {
                 let outcome =
                     session.case(|tx| insert_deny::check(tx, table, &self.name, identity))??;
                 let description = write::expectation(*expect).to_owned();
                 self.push(report, Op::Insert, origin, description, outcome);
             }
-            Some((Writes::Cases(cases), origin)) => {
+            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let outcome =
@@ -213,10 +213,10 @@ impl Cell<'_> {
                     );
                 }
             }
-            None => {}
+            Some((Spec::Todo, _)) | None => {}
         }
         match self.entry.update {
-            Some((Writes::Shorthand { expect, span }, origin)) => {
+            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
                 let at = self.at(*span);
                 let outcome = session.case(|tx| {
                     write::modify(tx, table, identity, Modify::Update(None), None, *expect, at)
@@ -224,7 +224,7 @@ impl Cell<'_> {
                 let description = write::expectation(*expect).to_owned();
                 self.push(report, Op::Update, origin, description, outcome);
             }
-            Some((Writes::Cases(cases), origin)) => {
+            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let set = case.set.as_deref();
@@ -244,10 +244,10 @@ impl Cell<'_> {
                     self.push(report, Op::Update, origin, description, outcome);
                 }
             }
-            None => {}
+            Some((Spec::Todo, _)) | None => {}
         }
         match self.entry.delete {
-            Some((Writes::Shorthand { expect, span }, origin)) => {
+            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
                 let at = self.at(*span);
                 let outcome = session.case(|tx| {
                     write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
@@ -255,7 +255,7 @@ impl Cell<'_> {
                 let description = write::expectation(*expect).to_owned();
                 self.push(report, Op::Delete, origin, description, outcome);
             }
-            Some((Writes::Cases(cases), origin)) => {
+            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let outcome = session.case(|tx| {
@@ -274,7 +274,7 @@ impl Cell<'_> {
                     self.push(report, Op::Delete, origin, description, outcome);
                 }
             }
-            None => {}
+            Some((Spec::Todo, _)) | None => {}
         }
         Ok(())
     }
@@ -284,11 +284,15 @@ impl Cell<'_> {
 fn check_columns(entry: &plan::Entry, catalog: &Catalog, diagnostics: &mut Vec<Diagnostic>) {
     let table = entry.table;
     let inserts = match entry.insert {
-        Some((Writes::Cases(cases), _)) => cases.iter().map(|c| c.values.as_slice()).collect(),
+        Some((Spec::Given(Writes::Cases(cases)), _)) => {
+            cases.iter().map(|c| c.values.as_slice()).collect()
+        }
         _ => Vec::new(),
     };
     let updates = match entry.update {
-        Some((Writes::Cases(cases), _)) => cases.iter().filter_map(|c| c.set.as_deref()).collect(),
+        Some((Spec::Given(Writes::Cases(cases)), _)) => {
+            cases.iter().filter_map(|c| c.set.as_deref()).collect()
+        }
         _ => Vec::new(),
     };
     let name = catalog.display_name(table);

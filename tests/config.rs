@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rlsspec::config::{self, Config, ConfigError};
+use rlsspec::config::{self, Config, ConfigError, Spec, Writes};
 
 fn env(name: &str) -> Option<String> {
     match name {
@@ -210,5 +210,34 @@ expect:
       insert: deny
       update: allow
 "#
+    ));
+}
+
+#[test]
+fn todo_is_accepted_for_every_operation() {
+    let config = parse(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { select: todo, insert: todo, update: todo, delete: todo }
+expect:
+  documents:
+    alice: { select: todo, insert: deny }
+"#,
+    )
+    .unwrap();
+    let ops = &config.defaults[0].ops;
+    assert_eq!(ops.select, Some(Spec::Todo));
+    assert_eq!(ops.insert, Some(Spec::Todo));
+    assert_eq!(ops.update, Some(Spec::Todo));
+    assert_eq!(ops.delete, Some(Spec::Todo));
+    let ops = &config.expect[0].ops;
+    assert_eq!(ops.select, Some(Spec::Todo));
+    assert!(matches!(
+        ops.insert,
+        Some(Spec::Given(Writes::Shorthand { .. }))
     ));
 }

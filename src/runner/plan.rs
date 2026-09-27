@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::Origin;
 use crate::catalog::{Catalog, Table};
 use crate::config::{
-    Block, Config, DeleteCase, Diagnostic, Identity, InsertCase, SelectCase, Span, TableRef,
+    Block, Config, DeleteCase, Diagnostic, Identity, InsertCase, SelectCase, Span, Spec, TableRef,
     UpdateCase, Writes,
 };
 
@@ -12,10 +12,10 @@ use crate::config::{
 pub struct Entry<'c> {
     pub table: &'c Table,
     pub identity: &'c Identity,
-    pub select: Option<(&'c SelectCase, Origin)>,
-    pub insert: Option<(&'c Writes<InsertCase>, Origin)>,
-    pub update: Option<(&'c Writes<UpdateCase>, Origin)>,
-    pub delete: Option<(&'c Writes<DeleteCase>, Origin)>,
+    pub select: Option<(&'c Spec<SelectCase>, Origin)>,
+    pub insert: Option<(&'c Spec<Writes<InsertCase>>, Origin)>,
+    pub update: Option<(&'c Spec<Writes<UpdateCase>>, Origin)>,
+    pub delete: Option<(&'c Spec<Writes<DeleteCase>>, Origin)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

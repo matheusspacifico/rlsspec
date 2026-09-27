@@ -56,40 +56,48 @@ Config {
             identity: "public_web",
             ops: Ops {
                 select: Some(
-                    SelectCase {
-                        select: Deny,
-                        span: Span {
-                            line: 19,
-                            column: 20,
+                    Given(
+                        SelectCase {
+                            select: Deny,
+                            span: Span {
+                                line: 19,
+                                column: 20,
+                            },
                         },
-                    },
+                    ),
                 ),
                 insert: Some(
-                    Shorthand {
-                        expect: Deny,
-                        span: Span {
-                            line: 19,
-                            column: 34,
+                    Given(
+                        Shorthand {
+                            expect: Deny,
+                            span: Span {
+                                line: 19,
+                                column: 34,
+                            },
                         },
-                    },
+                    ),
                 ),
                 update: Some(
-                    Shorthand {
-                        expect: Deny,
-                        span: Span {
-                            line: 19,
-                            column: 48,
+                    Given(
+                        Shorthand {
+                            expect: Deny,
+                            span: Span {
+                                line: 19,
+                                column: 48,
+                            },
                         },
-                    },
+                    ),
                 ),
                 delete: Some(
-                    Shorthand {
-                        expect: Deny,
-                        span: Span {
-                            line: 19,
-                            column: 62,
+                    Given(
+                        Shorthand {
+                            expect: Deny,
+                            span: Span {
+                                line: 19,
+                                column: 62,
+                            },
                         },
-                    },
+                    ),
                 ),
             },
             span: Span {
@@ -110,144 +118,152 @@ Config {
             identity: "alice",
             ops: Ops {
                 select: Some(
-                    SelectCase {
-                        select: Rows {
-                            predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a' and owner <> 'o''neil'",
-                            subset: false,
-                        },
-                        span: Span {
-                            line: 23,
-                            column: 15,
-                        },
-                    },
-                ),
-                insert: Some(
-                    Cases(
-                        [
-                            InsertCase {
-                                values: [
-                                    Assignment {
-                                        column: "tenant_id",
-                                        value: Some(
-                                            "0191e6a2-0000-7000-8000-00000000000a",
-                                        ),
-                                        span: Span {
-                                            line: 25,
-                                            column: 23,
-                                        },
-                                    },
-                                    Assignment {
-                                        column: "title",
-                                        value: Some(
-                                            "x",
-                                        ),
-                                        span: Span {
-                                            line: 25,
-                                            column: 49,
-                                        },
-                                    },
-                                    Assignment {
-                                        column: "rank",
-                                        value: Some(
-                                            "1.50",
-                                        ),
-                                        span: Span {
-                                            line: 25,
-                                            column: 61,
-                                        },
-                                    },
-                                    Assignment {
-                                        column: "archived_at",
-                                        value: None,
-                                        span: Span {
-                                            line: 25,
-                                            column: 73,
-                                        },
-                                    },
-                                ],
-                                expect: Allow,
-                                span: Span {
-                                    line: 25,
-                                    column: 11,
-                                },
+                    Given(
+                        SelectCase {
+                            select: Rows {
+                                predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a' and owner <> 'o''neil'",
+                                subset: false,
                             },
-                            InsertCase {
-                                values: [
-                                    Assignment {
-                                        column: "tenant_id",
-                                        value: Some(
-                                            "0191e6a2-0000-7000-8000-00000000000b",
-                                        ),
-                                        span: Span {
-                                            line: 26,
-                                            column: 23,
-                                        },
-                                    },
-                                    Assignment {
-                                        column: "title",
-                                        value: Some(
-                                            "x",
-                                        ),
-                                        span: Span {
-                                            line: 26,
-                                            column: 49,
-                                        },
-                                    },
-                                ],
-                                expect: Deny,
-                                span: Span {
-                                    line: 26,
-                                    column: 11,
-                                },
+                            span: Span {
+                                line: 23,
+                                column: 15,
                             },
-                        ],
+                        },
                     ),
                 ),
-                update: Some(
-                    Cases(
-                        [
-                            UpdateCase {
-                                predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
-                                set: None,
-                                expect: Allow,
-                                span: Span {
-                                    line: 28,
-                                    column: 11,
+                insert: Some(
+                    Given(
+                        Cases(
+                            [
+                                InsertCase {
+                                    values: [
+                                        Assignment {
+                                            column: "tenant_id",
+                                            value: Some(
+                                                "0191e6a2-0000-7000-8000-00000000000a",
+                                            ),
+                                            span: Span {
+                                                line: 25,
+                                                column: 23,
+                                            },
+                                        },
+                                        Assignment {
+                                            column: "title",
+                                            value: Some(
+                                                "x",
+                                            ),
+                                            span: Span {
+                                                line: 25,
+                                                column: 49,
+                                            },
+                                        },
+                                        Assignment {
+                                            column: "rank",
+                                            value: Some(
+                                                "1.50",
+                                            ),
+                                            span: Span {
+                                                line: 25,
+                                                column: 61,
+                                            },
+                                        },
+                                        Assignment {
+                                            column: "archived_at",
+                                            value: None,
+                                            span: Span {
+                                                line: 25,
+                                                column: 73,
+                                            },
+                                        },
+                                    ],
+                                    expect: Allow,
+                                    span: Span {
+                                        line: 25,
+                                        column: 11,
+                                    },
                                 },
-                            },
-                            UpdateCase {
-                                predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
-                                set: Some(
-                                    [
+                                InsertCase {
+                                    values: [
                                         Assignment {
                                             column: "tenant_id",
                                             value: Some(
                                                 "0191e6a2-0000-7000-8000-00000000000b",
                                             ),
                                             span: Span {
-                                                line: 29,
-                                                column: 54,
+                                                line: 26,
+                                                column: 23,
+                                            },
+                                        },
+                                        Assignment {
+                                            column: "title",
+                                            value: Some(
+                                                "x",
+                                            ),
+                                            span: Span {
+                                                line: 26,
+                                                column: 49,
                                             },
                                         },
                                     ],
-                                ),
-                                expect: Deny,
-                                span: Span {
-                                    line: 29,
-                                    column: 11,
+                                    expect: Deny,
+                                    span: Span {
+                                        line: 26,
+                                        column: 11,
+                                    },
                                 },
-                            },
-                        ],
+                            ],
+                        ),
+                    ),
+                ),
+                update: Some(
+                    Given(
+                        Cases(
+                            [
+                                UpdateCase {
+                                    predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                    set: None,
+                                    expect: Allow,
+                                    span: Span {
+                                        line: 28,
+                                        column: 11,
+                                    },
+                                },
+                                UpdateCase {
+                                    predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                    set: Some(
+                                        [
+                                            Assignment {
+                                                column: "tenant_id",
+                                                value: Some(
+                                                    "0191e6a2-0000-7000-8000-00000000000b",
+                                                ),
+                                                span: Span {
+                                                    line: 29,
+                                                    column: 54,
+                                                },
+                                            },
+                                        ],
+                                    ),
+                                    expect: Deny,
+                                    span: Span {
+                                        line: 29,
+                                        column: 11,
+                                    },
+                                },
+                            ],
+                        ),
                     ),
                 ),
                 delete: Some(
-                    Shorthand {
-                        expect: Deny,
-                        span: Span {
-                            line: 30,
-                            column: 15,
+                    Given(
+                        Shorthand {
+                            expect: Deny,
+                            span: Span {
+                                line: 30,
+                                column: 15,
+                            },
                         },
-                    },
+                    ),
                 ),
             },
             span: Span {
@@ -266,16 +282,18 @@ Config {
             identity: "public_web",
             ops: Ops {
                 select: Some(
-                    SelectCase {
-                        select: Rows {
-                            predicate: "published",
-                            subset: true,
+                    Given(
+                        SelectCase {
+                            select: Rows {
+                                predicate: "published",
+                                subset: true,
+                            },
+                            span: Span {
+                                line: 32,
+                                column: 15,
+                            },
                         },
-                        span: Span {
-                            line: 32,
-                            column: 15,
-                        },
-                    },
+                    ),
                 ),
                 insert: None,
                 update: None,

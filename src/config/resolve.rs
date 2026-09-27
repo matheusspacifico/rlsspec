@@ -9,14 +9,13 @@ use super::raw::{
 };
 use super::vars::{self, Mode, Reference};
 use super::{
-    Assignment, Assignments, Block, Config, Database, DeleteCase, Diagnostic, Expectation,
-    Identity, InsertCase, Ops, Safety, Select, SelectCase, Span, TableRef, UpdateCase, Writes,
+    Assignment, Assignments, Block, Config, DEFAULT_LOCK_TIMEOUT, DEFAULT_STATEMENT_TIMEOUT,
+    Database, DeleteCase, Diagnostic, Expectation, Identity, InsertCase, Ops, Safety, Select,
+    SelectCase, Span, Spec, TableRef, UpdateCase, Writes,
 };
 
 const SUPPORTED_VERSION: u32 = 1;
 const WILDCARD: &str = "*";
-const DEFAULT_LOCK_TIMEOUT: &str = "5s";
-const DEFAULT_STATEMENT_TIMEOUT: &str = "30s";
 const TIMEOUT_UNITS: [&str; 6] = ["us", "ms", "s", "min", "h", "d"];
 
 pub fn resolve(
@@ -330,9 +329,10 @@ impl Resolver<'_> {
         }
     }
 
-    fn select(&mut self, raw: Spanned<RawSelect>) -> SelectCase {
+    fn select(&mut self, raw: Spanned<RawSelect>) -> Spec<SelectCase> {
         let at = span(&raw);
         let select = match raw.value {
+            RawSelect::Todo => return Spec::Todo,
             RawSelect::Deny => Select::Deny,
             RawSelect::All => Select::All,
             RawSelect::Rows { rows, subset } => Select::Rows {
@@ -340,16 +340,17 @@ impl Resolver<'_> {
                 subset,
             },
         };
-        SelectCase { select, span: at }
+        Spec::Given(SelectCase { select, span: at })
     }
 
     fn writes<R, C>(
         &mut self,
         raw: Spanned<RawWrites<R>>,
         mut case: impl FnMut(&mut Self, Spanned<R>) -> C,
-    ) -> Writes<C> {
+    ) -> Spec<Writes<C>> {
         let at = span(&raw);
-        match raw.value {
+        let writes = match raw.value {
+            RawWrites::Todo => return Spec::Todo,
             RawWrites::Shorthand(expect) => Writes::Shorthand { expect, span: at },
             RawWrites::Cases(cases) => {
                 if cases.is_empty() {
@@ -357,7 +358,8 @@ impl Resolver<'_> {
                 }
                 Writes::Cases(cases.into_iter().map(|c| case(self, c)).collect())
             }
-        }
+        };
+        Spec::Given(writes)
     }
 
     fn predicate(&mut self, raw: &Spanned<String>) -> String {

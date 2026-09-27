@@ -2,7 +2,7 @@
 source: tests/config.rs
 expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n  documents:\n    alice:\n      select: maybe\n\"#)"
 ---
-error: invalid value: string "maybe", expected `deny`, `all` or a mapping with `rows`
+error: invalid value: string "maybe", expected `deny`, `all`, `todo` or a mapping with `rows`
  --> rlsspec.yaml:8:7
   |
 8 |       select: maybe
