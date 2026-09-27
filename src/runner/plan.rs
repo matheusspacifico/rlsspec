@@ -18,6 +18,21 @@ pub struct Entry<'c> {
     pub delete: Option<(&'c Spec<Writes<DeleteCase>>, Origin)>,
 }
 
+impl Entry<'_> {
+    /// Whether each of select, insert, update and delete has at least one case (not `todo`).
+    pub fn specified(&self) -> [bool; 4] {
+        fn given<T>(op: Option<(&Spec<T>, Origin)>) -> bool {
+            matches!(op, Some((Spec::Given(_), _)))
+        }
+        [
+            given(self.select),
+            given(self.insert),
+            given(self.update),
+            given(self.delete),
+        ]
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Rank {
     Expect,

@@ -226,6 +226,7 @@ mod tests {
                 case("guest", Outcome::Fail("leaked 1 of 2 rows: id=1".into())),
                 case("bob", Outcome::Inconclusive("vacuous".into())),
             ],
+            ..Report::default()
         }
     }
 

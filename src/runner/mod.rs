@@ -1,3 +1,4 @@
+pub mod coverage;
 mod insert_deny;
 mod plan;
 mod select;
@@ -11,6 +12,7 @@ use crate::config::{
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session};
+use coverage::Coverage;
 use write::Modify;
 
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +42,8 @@ pub enum Op {
 }
 
 impl Op {
+    pub const ALL: [Op; 4] = [Op::Select, Op::Insert, Op::Update, Op::Delete];
+
     pub fn as_str(self) -> &'static str {
         match self {
             Op::Select => "select",
@@ -77,6 +81,7 @@ pub struct CaseResult {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Report {
     pub results: Vec<CaseResult>,
+    pub coverage: Coverage,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -103,12 +108,13 @@ impl Report {
         totals
     }
 
-    /// 2 when anything is inconclusive (the run is incomplete), else 1 on failures, else 0.
+    /// 2 when anything is inconclusive (the run is incomplete), else 1 on failures or on
+    /// unspecified cells under `unspecified: fail`, else 0.
     pub fn exit_code(&self) -> u8 {
         let totals = self.totals();
         if totals.inconclusive > 0 {
             2
-        } else if totals.failed > 0 {
+        } else if totals.failed > 0 || self.coverage.fails() {
             1
         } else {
             0
@@ -117,6 +123,35 @@ impl Report {
 }
 
 pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
+    in_session(config, source, |session, catalog, plan| {
+        let mut report = Report {
+            results: Vec::new(),
+            coverage: coverage::compute(config, catalog, plan),
+        };
+        for entry in plan {
+            let cell = Cell {
+                entry,
+                name: catalog.display_name(entry.table),
+                path: &source.path,
+            };
+            cell.check(session, &mut report)?;
+        }
+        Ok(report)
+    })
+}
+
+/// Everything `run` does before the first case (setup, catalog, spec validation), then the coverage.
+pub fn cover(config: &Config, source: &Source) -> Result<Coverage, RunError> {
+    in_session(config, source, |_, catalog, plan| {
+        Ok(coverage::compute(config, catalog, plan))
+    })
+}
+
+fn in_session<T>(
+    config: &Config,
+    source: &Source,
+    f: impl FnOnce(&mut Session, &Catalog, &[plan::Entry]) -> Result<T, RunError>,
+) -> Result<T, RunError> {
     let mut client = pg::connect(&config.database.url)?;
     let mut session = Session::begin(&mut client, &config.safety)?;
     session.run_setup(&config.setup)?;
@@ -135,17 +170,9 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
         return Err(RunError::Config(source.invalid(diagnostics)));
     }
 
-    let mut report = Report::default();
-    for entry in &plan {
-        let cell = Cell {
-            entry,
-            name: catalog.display_name(entry.table),
-            path: &source.path,
-        };
-        cell.check(&mut session, &mut report)?;
-    }
+    let out = f(&mut session, &catalog, &plan)?;
     session.rollback()?;
-    Ok(report)
+    Ok(out)
 }
 
 struct Cell<'a> {

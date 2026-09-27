@@ -146,13 +146,14 @@ pub fn first_updatable_column(
 
 impl Catalog {
     #[cfg(test)]
-    fn new(schemas: &[&str], tables: &[(&str, &str)]) -> Self {
+    pub(crate) fn new(schemas: &[&str], tables: &[(&str, &str)]) -> Self {
         Self {
             schemas: schemas.iter().map(|s| s.to_string()).collect(),
             tables: tables
                 .iter()
-                .map(|(schema, name)| Table {
-                    oid: 0,
+                .zip(1..)
+                .map(|((schema, name), oid)| Table {
+                    oid,
                     schema: schema.to_string(),
                     name: name.to_string(),
                     primary_key: Vec::new(),
