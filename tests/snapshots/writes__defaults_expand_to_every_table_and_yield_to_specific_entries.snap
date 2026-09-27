@@ -3,19 +3,10 @@ source: tests/writes.rs
 expression: "report(\"defaults_pass\", 0)"
 ---
 notes
-  ✓ alice  select  all                                6 visible
+  ✓ alice  *       select all, delete deny            2/2 ops
   ✓ alice  update  where tenant_id = '…000a' → allow  affected 3 of 3 rows
-  ✓ alice  delete  deny                               affected 0 of 6 rows
-  ✓ guest  select  deny                               permission denied
-  ✓ guest  insert  deny                               deny (no privilege)
-  ✓ guest  update  deny                               denied: no UPDATE privilege
-  ✓ guest  delete  deny                               permission denied
+  ✓ guest  *       deny                               4/4 ops
 tags
-  ✓ alice  select  rows: tenant_id = '…000a'  1 visible
-  ✓ alice  update  deny                       denied: no UPDATE privilege
-  ✓ alice  delete  deny                       permission denied
-  ✓ guest  select  deny                       permission denied
-  ✓ guest  insert  deny                       deny (no privilege)
-  ✓ guest  update  deny                       denied: no UPDATE privilege
-  ✓ guest  delete  deny                       permission denied
+  ✓ alice  *  select rows: tenant_id = '…000a', update deny, delete deny  3/3 ops
+  ✓ guest  *  deny                                                        4/4 ops
 0 failed · 14 passed · 0 inconclusive
