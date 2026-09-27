@@ -53,7 +53,8 @@ pub struct TruePolicy {
     pub check_true: bool,
 }
 
-/// A `SECURITY DEFINER` function without `search_path` in its settings that the role can execute.
+/// A `SECURITY DEFINER` function without `search_path` in its settings that the role can execute,
+/// and that doesn't belong to an extension.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
     pub schema: String,
@@ -125,6 +126,8 @@ WHERE p.prosecdef
   AND (n.nspname = ANY($1) OR has_schema_privilege($2::name, n.oid, 'USAGE'))
   AND has_function_privilege($2::name, p.oid, 'EXECUTE')
   AND NOT EXISTS (SELECT 1 FROM unnest(p.proconfig) AS s(setting) WHERE s.setting LIKE 'search_path=%')
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
 ORDER BY 1, 2, 3";
 
 // The tables a view reads directly are the ones its `_RETURN` rule depends on.
