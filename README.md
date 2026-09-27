@@ -38,26 +38,118 @@ expect:
 ```console
 $ rlsspec test
 documents
-  ✓ alice   select  rows: tenant_id = '…0a'          12 visible
-  ✗ alice   update  where tenant_id = '…0b' → deny    affected 3 of 3 rows (expected 0)
-  ✓ guest   *       deny                              4/4 ops
-coverage 86/96 cells (89.6%) · 10 unspecified
-1 failed · 41 passed · 0 inconclusive
+  ✓ alice  select  rows: tenant_id = '…000a'                           12 visible
+  ✓ alice  insert  values (tenant_id = '…000a', title = 'ok') → allow  inserted
+  ✓ alice  insert  values (tenant_id = '…000b', title = 'x') → deny    permission denied
+  ✗ alice  update  where tenant_id = '…000b' → deny                    affected 3 of 3 rows (expected 0)
+  ✓ alice  delete  deny                                                permission denied
+  ✓ guest  *       deny                                                4/4 ops
+1 failed · 5 passed · 0 inconclusive
 ```
 
-## Planned features (v0.1)
+> **Status: early development.** The checks below work today; there is no release yet, so you build it from
+> source. Expect the spec format to change before v0.1.
+
+## Features
+
+Working now:
 
 - **Intent-based checks** for `SELECT`, `INSERT`, `UPDATE` and `DELETE`, run as each identity against a real
-  database. Reports rows that *leaked* and rows that were wrongly *hidden*.
+  database. Reports rows that *leaked*, rows that were wrongly *hidden*, and partial writes
+  (`affected 2 of 3 rows`).
 - **Safe by construction**: everything runs in one transaction that is always rolled back; remote hosts are
   refused unless explicitly allowed.
-- **No false passes**: a check that can't fail is an error, and only a real permission error counts as "denied".
-- **Coverage matrix** of identities × tables × operations, with an option to fail CI when a new table has no spec.
+- **No false passes**: a check that can't fail (empty table, predicate matching nothing) is an error, and only a
+  real permission error or zero affected rows counts as "denied".
+- **Defaults**: `"*": { select: deny, … }` for an identity, overridden per table.
+- **Vendor-neutral**: an identity is a Postgres role + session settings (GUCs), so it fits any RLS design.
+- **CI-friendly** exit codes: `0` all good, `1` failures, `2` config/connection errors or inconclusive cases.
+
+Planned for v0.1:
+
+- **Coverage matrix** of identities × tables × operations, with an option to fail CI when a new table has no
+  spec; `rlsspec init` to scaffold a spec from the database.
+- A **`supabase` preset** that maps JWT claims so `auth.uid()` and friends just work.
 - **Lint** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`, unsafe
   `SECURITY DEFINER` functions, views that bypass RLS.
-- **Vendor-neutral**: an identity is a Postgres role + session settings. A `supabase` preset maps JWT claims
-  so `auth.uid()` and friends just work.
-- **CI-friendly**: single static binary, stable exit codes, JSON and JUnit output, GitHub Action.
+- JSON and JUnit output, prebuilt binaries, a GitHub Action.
+
+## Getting started
+
+### Requirements
+
+- **Rust** (stable) to build it: install with [rustup](https://rustup.rs).
+- **PostgreSQL 14 or later**, reachable from where you run it. Use a local, CI or disposable database (see
+  [Safety](#safety)).
+- A **privileged connection**: the `database.url` role must be a superuser, have `BYPASSRLS`, or own the
+  tables without `FORCE ROW LEVEL SECURITY`, and must be able to `SET ROLE` to every identity's role.
+- **Docker**, only to run the example or the project's own tests.
+
+### Install
+
+```console
+$ cargo install --git https://github.com/matheusspacifico/rlsspec
+$ rlsspec version
+```
+
+### Try the example
+
+[`examples/multitenant`](examples/multitenant) is a small project tracker with every identity × table ×
+operation specified:
+
+```console
+$ git clone https://github.com/matheusspacifico/rlsspec && cd rlsspec/examples/multitenant
+$ docker compose up -d --wait
+$ export DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres
+$ rlsspec test
+```
+
+### Write your own spec
+
+Create `rlsspec.yaml` next to your project (or pass `-c path/to/spec.yaml`):
+
+```yaml
+version: 1
+
+database:
+  url: ${env:DATABASE_URL}        # read from the environment
+  schemas: [public]               # tables in scope
+
+setup:                            # optional SQL files run first, as the privileged role (rolled back)
+  - fixtures.sql
+
+vars:                             # ${name}: a quoted literal in SQL predicates, a raw value elsewhere
+  tenant_a: 0191e6a2-0000-7000-8000-00000000000a
+
+identities:                       # a Postgres role + session settings
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}" } }
+  guest: { role: web_anon }
+
+expect:                           # table → identity → operations
+  documents:
+    alice:
+      select: { rows: "tenant_id = ${tenant_a}" }
+```
+
+Then run `rlsspec test`. The rows your checks need must exist: put them in the database beforehand or in
+`setup` files (a check against an empty table is reported as an error, never a pass).
+
+| Form | Passes when |
+|---|---|
+| `select: deny` | the identity sees no rows |
+| `select: all` | it sees every row |
+| `select: { rows: "<sql>" }` | it sees exactly the rows where the predicate holds (`subset: true`: at most those) |
+| `insert: [{ values: {…}, expect: allow\|deny }]` | the row is inserted / rejected with a permission error |
+| `insert: deny` | the catalog proves no insert can succeed (no privilege, or no permissive policy applies) |
+| `update: [{ where: "<sql>", set?: {…}, expect: allow\|deny }]` | every / none of the rows matching `where` are updated |
+| `delete: [{ where: "<sql>", expect: allow\|deny }]` | every / none of the rows matching `where` are deleted |
+| `update: allow\|deny`, `delete: allow\|deny` | the same, over every row of the table |
+
+`defaults` takes the same operations keyed by identity, then table or `"*"` for every table; entries under
+`expect` win over a named table, which wins over `"*"`.
+
+Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
+`--no-color`.
 
 ## Safety
 
