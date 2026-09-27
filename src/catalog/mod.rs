@@ -65,6 +65,14 @@ impl Catalog {
         }
     }
 
+    /// The shortest name that resolves back to `table`.
+    pub fn display_name(&self, table: &Table) -> String {
+        match self.resolve(&table.name) {
+            Ok(found) if found == table => table.name.clone(),
+            _ => format!("{}.{}", table.schema, table.name),
+        }
+    }
+
     /// Resolves `table` or `schema.table` against the schemas in scope.
     pub fn resolve(&self, name: &str) -> Result<&Table, String> {
         let find = |schema: &str, table: &str| {
@@ -118,6 +126,8 @@ mod tests {
         assert_eq!(catalog.resolve("notes").unwrap().schema, "app");
         assert_eq!(catalog.resolve("app.notes").unwrap().name, "notes");
         assert_eq!(catalog.resolve("tags").unwrap().schema, "public");
+        let notes = catalog.resolve("app.notes").unwrap();
+        assert_eq!(catalog.display_name(notes), "notes");
     }
 
     #[test]
@@ -134,6 +144,8 @@ mod tests {
             catalog.resolve("notes").unwrap_err(),
             "table `notes` is ambiguous: it exists in schemas public, app; write `public.notes`"
         );
+        let notes = catalog.resolve("app.notes").unwrap();
+        assert_eq!(catalog.display_name(notes), "app.notes");
         assert_eq!(
             catalog.resolve("other.x").unwrap_err(),
             "schema `other` is not listed in `database.schemas`"

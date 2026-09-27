@@ -93,7 +93,7 @@ impl<'a> Session<'a> {
                 .map_err(|err| setup_failed(path, &err))?;
         }
         // A setup file may have switched role or loosened the session settings.
-        self.tx.batch_execute("RESET ROLE")?;
+        self.tx.execute("RESET ROLE", &[])?;
         self.harden()?;
         Ok(())
     }
