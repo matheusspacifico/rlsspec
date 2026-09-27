@@ -2,6 +2,8 @@ use std::fmt::Write;
 
 use anstyle::Style;
 
+use crate::config::Unspecified;
+use crate::runner::coverage::Coverage;
 use crate::runner::{CaseResult, Op, Origin, Outcome, Report};
 use crate::style;
 
@@ -160,6 +162,7 @@ pub fn render(report: &Report) -> String {
         }
     }
 
+    out.push_str(&coverage_summary(&report.coverage));
     let totals = report.totals();
     let count = |n: usize, label: &str, when_nonzero: Style| {
         let s = if n > 0 { when_nonzero } else { Style::new() };
@@ -173,6 +176,57 @@ pub fn render(report: &Report) -> String {
         count(totals.inconclusive, "inconclusive", style::INCONCLUSIVE)
     );
     out
+}
+
+/// `coverage 86/96 cells (89.6%) · 10 unspecified (warn)`, then the gaps unless `ignore`.
+fn coverage_summary(coverage: &Coverage) -> String {
+    let mut out = coverage_line(coverage);
+    if coverage.policy == Unspecified::Ignore {
+        return out;
+    }
+    let mark = gap_style(coverage.policy);
+    let header = style::EMPHASIS;
+    for (table, gaps) in coverage.gaps() {
+        let _ = writeln!(out, "{header}{table}{header:#}");
+        let width = gaps.iter().map(|g| g.identity.chars().count()).max();
+        let width = width.unwrap_or(0);
+        for gap in gaps {
+            let ops: Vec<&str> = gap.ops.iter().map(|op| op.as_str()).collect();
+            let _ = writeln!(
+                out,
+                "  {mark}○{mark:#} {:<width$}  {}",
+                gap.identity,
+                ops.join(", ")
+            );
+        }
+    }
+    out
+}
+
+fn gap_style(policy: Unspecified) -> Style {
+    match policy {
+        Unspecified::Fail => style::FAIL,
+        Unspecified::Warn | Unspecified::Ignore => style::INCONCLUSIVE,
+    }
+}
+
+pub fn coverage_line(coverage: &Coverage) -> String {
+    let (specified, total) = (coverage.specified(), coverage.total());
+    let unspecified = coverage.unspecified();
+    // Rounded down, so a single gap never shows as 100.0%.
+    let percent = match (specified * 1000).checked_div(total) {
+        Some(tenths) => format!(" ({}.{}%)", tenths / 10, tenths % 10),
+        None => String::new(),
+    };
+    let s = if unspecified > 0 && coverage.policy != Unspecified::Ignore {
+        gap_style(coverage.policy)
+    } else {
+        Style::new()
+    };
+    format!(
+        "coverage {specified}/{total} cells{percent} · {s}{unspecified} unspecified ({}){s:#}\n",
+        coverage.policy.as_str()
+    )
 }
 
 /// Shortens long quoted literals (typically UUIDs) to their last characters: `'…000a'`.
@@ -210,6 +264,7 @@ fn shorten_literals(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runner::coverage::TableCoverage;
 
     fn report() -> Report {
         let case = |identity: &str, outcome| CaseResult {
@@ -240,8 +295,49 @@ mod tests {
   ✓ alice  select  deny  0 visible
   ✗ guest  select  deny  leaked 1 of 2 rows: id=1
   ? bob    select  deny  vacuous
+coverage 0/0 cells · 0 unspecified (warn)
 1 failed · 1 passed · 1 inconclusive
 "
+        );
+    }
+
+    fn coverage(policy: Unspecified, cells: [[bool; 4]; 2]) -> Coverage {
+        Coverage {
+            policy,
+            identities: vec!["alice".into(), "bob".into()],
+            tables: vec![TableCoverage {
+                table: "notes".into(),
+                cells: cells.to_vec(),
+            }],
+        }
+    }
+
+    fn plain(text: &str) -> String {
+        anstream::adapter::strip_str(text).to_string()
+    }
+
+    #[test]
+    fn coverage_lists_gaps_unless_ignored() {
+        let cells = [[true; 4], [true, false, false, true]];
+        assert_eq!(
+            plain(&coverage_summary(&coverage(Unspecified::Warn, cells))),
+            "coverage 6/8 cells (75.0%) · 2 unspecified (warn)\nnotes\n  ○ bob  insert, update\n"
+        );
+        assert_eq!(
+            plain(&coverage_summary(&coverage(Unspecified::Ignore, cells))),
+            "coverage 6/8 cells (75.0%) · 2 unspecified (ignore)\n"
+        );
+    }
+
+    #[test]
+    fn coverage_percentage_rounds_down() {
+        let mut coverage = coverage(Unspecified::Fail, [[true; 4]; 2]);
+        coverage.tables[0].cells = vec![[true; 4]; 250];
+        coverage.identities = vec!["x".into(); 250];
+        coverage.tables[0].cells[0][0] = false;
+        assert_eq!(
+            plain(&coverage_line(&coverage)),
+            "coverage 999/1000 cells (99.9%) · 1 unspecified (fail)\n"
         );
     }
 

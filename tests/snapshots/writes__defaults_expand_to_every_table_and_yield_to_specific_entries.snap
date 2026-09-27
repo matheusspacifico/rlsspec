@@ -9,4 +9,9 @@ notes
 tags
   ✓ alice  *  select rows: tenant_id = '…000a', update deny, delete deny  3/3 ops
   ✓ guest  *  deny                                                        4/4 ops
+coverage 14/16 cells (87.5%) · 2 unspecified (warn)
+notes
+  ○ alice  insert
+tags
+  ○ alice  insert
 0 failed · 14 passed · 0 inconclusive

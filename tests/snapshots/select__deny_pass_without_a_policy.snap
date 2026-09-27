@@ -4,4 +4,8 @@ expression: "run(\"deny_no_policy\", 0)"
 ---
 notes
   ✓ guest  select  deny  0 visible
+coverage 1/8 cells (12.5%) · 7 unspecified (warn)
+notes
+  ○ alice  select, insert, update, delete
+  ○ guest  insert, update, delete
 0 failed · 1 passed · 0 inconclusive

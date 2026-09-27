@@ -4,4 +4,7 @@ expression: out.stdout
 ---
 notes
   ✓ alice  select  rows: tenant_id = '…000a'  3 visible
+coverage 1/4 cells (25.0%) · 3 unspecified (warn)
+notes
+  ○ alice  insert, update, delete
 0 failed · 1 passed · 0 inconclusive

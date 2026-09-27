@@ -75,4 +75,5 @@ tasks
   ✓ cleo  delete  where org_id = '…10be' → allow                                                                 affected 2 of 2 rows
   ✓ cleo  delete  where org_id = '…ac3e' → deny                                                                  affected 0 of 3 rows
   ✓ anon  *       deny                                                                                           4/4 ops
+coverage 64/64 cells (100.0%) · 0 unspecified (warn)
 1 failed · 88 passed · 0 inconclusive

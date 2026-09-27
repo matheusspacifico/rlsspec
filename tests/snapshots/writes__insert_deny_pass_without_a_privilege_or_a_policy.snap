@@ -5,4 +5,11 @@ expression: "report(\"insert_deny_pass\", 0)"
 notes
   ✓ alice  insert  deny  deny (no policy)
   ✓ guest  insert  deny  deny (no privilege)
+coverage 2/16 cells (12.5%) · 14 unspecified (warn)
+notes
+  ○ alice  select, update, delete
+  ○ guest  select, update, delete
+tags
+  ○ alice  select, insert, update, delete
+  ○ guest  select, insert, update, delete
 0 failed · 2 passed · 0 inconclusive

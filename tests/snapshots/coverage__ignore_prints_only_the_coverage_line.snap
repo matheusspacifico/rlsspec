@@ -1,0 +1,11 @@
+---
+source: tests/coverage.rs
+expression: out
+---
+notes
+  ✓ alice  insert  deny         deny (no policy)
+  ✓ alice  *       delete deny  1/1 ops
+tags
+  ✓ alice  *  deny  2/2 ops
+coverage 4/16 cells (25.0%) · 12 unspecified (ignore)
+0 failed · 4 passed · 0 inconclusive

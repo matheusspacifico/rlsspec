@@ -5,4 +5,11 @@ expression: "report(\"insert_check_true\", 1)"
 notes
   ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce', body = 'mine') → allow   inserted
   ✗ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = 'theirs') → deny  inserted (expected a permission error)
+coverage 1/16 cells (6.2%) · 15 unspecified (warn)
+notes
+  ○ alice  select, update, delete
+  ○ guest  select, insert, update, delete
+tags
+  ○ alice  select, insert, update, delete
+  ○ guest  select, insert, update, delete
 1 failed · 1 passed · 0 inconclusive

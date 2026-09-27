@@ -1,0 +1,17 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+  guest: { role: web_anon }
+unspecified: fail
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }
+  alice:
+    "*": { insert: deny, update: deny, delete: deny }
+expect:
+  notes:
+    alice: { select: all }
+  tags:
+    alice: { select: { rows: "tenant_id = '00000000-0000-4000-8000-00000000000a'" } }

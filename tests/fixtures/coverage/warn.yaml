@@ -1,0 +1,14 @@
+# alice's update on notes is todo: it beats the default, counts as unspecified and runs nothing.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+  guest: { role: web_anon }
+unspecified: warn
+defaults:
+  alice:
+    "*": { update: deny, delete: deny }
+expect:
+  notes:
+    alice: { select: todo, insert: deny, update: todo }

@@ -4,4 +4,7 @@ expression: out.stdout
 ---
 notes
   ? alice  select  rows: true; drop table notes  query as admin failed: syntax error at or near ";" (SQLSTATE 42601) (tests/fixtures/session/injection.yaml:11:15)
+coverage 1/4 cells (25.0%) · 3 unspecified (warn)
+notes
+  ○ alice  insert, update, delete
 0 failed · 0 passed · 1 inconclusive

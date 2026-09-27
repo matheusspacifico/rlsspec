@@ -6,4 +6,11 @@ notes
   ✓ alice  update  where tenant_id = '…000a' → allow                         affected 3 of 3 rows
   ✗ alice  update  where tenant_id = '…000b' → deny                          affected 3 of 3 rows (expected 0)
   ✗ alice  update  where tenant_id = '…000a' set tenant_id = '…000b' → deny  affected 3 of 3 rows (expected 0)
+coverage 1/16 cells (6.2%) · 15 unspecified (warn)
+notes
+  ○ alice  select, insert, delete
+  ○ guest  select, insert, update, delete
+tags
+  ○ alice  select, insert, update, delete
+  ○ guest  select, insert, update, delete
 2 failed · 1 passed · 0 inconclusive

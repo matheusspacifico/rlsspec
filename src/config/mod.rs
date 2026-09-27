@@ -67,6 +67,16 @@ pub enum Unspecified {
     Fail,
 }
 
+impl Unspecified {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Unspecified::Ignore => "ignore",
+            Unspecified::Warn => "warn",
+            Unspecified::Fail => "fail",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TableRef {
     All,

@@ -5,4 +5,11 @@ expression: "report(\"not_null\", 2)"
 notes
   ? alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce') → allow              insert as `alice` failed: null value in column "body" of relation "notes" violates not-null constraint (SQLSTATE 23502) (tests/fixtures/writes/not_null.yaml:15:11)
   ✓ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = NULL) → deny  permission denied
+coverage 1/16 cells (6.2%) · 15 unspecified (warn)
+notes
+  ○ alice  select, update, delete
+  ○ guest  select, insert, update, delete
+tags
+  ○ alice  select, insert, update, delete
+  ○ guest  select, insert, update, delete
 0 failed · 1 passed · 1 inconclusive

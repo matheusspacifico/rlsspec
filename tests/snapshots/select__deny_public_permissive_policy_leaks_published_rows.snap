@@ -4,4 +4,8 @@ expression: "run(\"deny_permissive_widens\", 1)"
 ---
 notes
   ✗ guest  select  deny  leaked 2 of 6 rows: id=2, id=4
+coverage 1/8 cells (12.5%) · 7 unspecified (warn)
+notes
+  ○ alice  select, insert, update, delete
+  ○ guest  insert, update, delete
 1 failed · 0 passed · 0 inconclusive

@@ -1,0 +1,17 @@
+---
+source: tests/coverage.rs
+expression: "report(\"warn\", 0)"
+---
+notes
+  ✓ alice  insert  deny         deny (no policy)
+  ✓ alice  *       delete deny  1/1 ops
+tags
+  ✓ alice  *  deny  2/2 ops
+coverage 4/16 cells (25.0%) · 12 unspecified (warn)
+notes
+  ○ alice  select, update
+  ○ guest  select, insert, update, delete
+tags
+  ○ alice  select, insert
+  ○ guest  select, insert, update, delete
+0 failed · 4 passed · 0 inconclusive

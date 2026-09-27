@@ -6,4 +6,14 @@ notes
   ? alice  update  where id > 100 → deny  vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/writes/vacuous.yaml:15:11)
 drafts
   ? alice  delete  deny  vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup (tests/fixtures/writes/vacuous.yaml:17:22)
+coverage 2/24 cells (8.3%) · 22 unspecified (warn)
+notes
+  ○ alice  select, insert, delete
+  ○ guest  select, insert, update, delete
+tags
+  ○ alice  select, insert, update, delete
+  ○ guest  select, insert, update, delete
+drafts
+  ○ alice  select, insert, update
+  ○ guest  select, insert, update, delete
 0 failed · 0 passed · 2 inconclusive
