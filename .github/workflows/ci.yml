@@ -44,3 +44,17 @@ jobs:
         env:
           INSTA_UPDATE: "no"
           RLSSPEC_PG_TAG: ${{ matrix.postgres }}
+
+  example:
+    name: example (multitenant)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
+      - run: docker compose -f examples/multitenant/docker-compose.yml up -d --wait
+      # Any non-zero exit (failures or inconclusive cases) fails the job.
+      - run: ./target/debug/rlsspec test -c examples/multitenant/rlsspec.yaml
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
