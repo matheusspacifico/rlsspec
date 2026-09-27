@@ -77,6 +77,8 @@ SELECT has_table_privilege($2::name, c.oid, 'INSERT') OR has_any_column_privileg
        coalesce((SELECT array_agg(p.polname::text ORDER BY p.polname)
                  FROM pg_policy p
                  WHERE p.polrelid = c.oid AND p.polpermissive AND p.polcmd IN ('a', '*')
+                   -- An ALL policy without WITH CHECK checks new rows with its USING.
+                   AND coalesce(pg_get_expr(coalesce(p.polwithcheck, p.polqual), p.polrelid), '') <> 'false'
                    AND ",
     policy_applies_to_role!(),
     "),

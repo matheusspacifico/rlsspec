@@ -117,6 +117,11 @@ fn only_a_constant_update_over_every_row_sees_past_the_select_policies() {
 }
 
 #[test]
+fn insert_deny_ignores_policies_whose_check_is_false() {
+    insta::assert_snapshot!(report("insert_deny_check_false", 0));
+}
+
+#[test]
 fn audit_trigger_behind_a_correct_policy_passes() {
     insta::assert_snapshot!(report("audited_pass", 0));
 }
