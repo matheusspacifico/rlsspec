@@ -1,0 +1,9 @@
+---
+source: tests/writes.rs
+expression: "report(\"update_using_true\", 1)"
+---
+notes
+  ✓ alice  update  where tenant_id = '…000a' → allow                         affected 3 of 3 rows
+  ✗ alice  update  where tenant_id = '…000b' → deny                          affected 3 of 3 rows (expected 0)
+  ✗ alice  update  where tenant_id = '…000a' set tenant_id = '…000b' → deny  affected 3 of 3 rows (expected 0)
+2 failed · 1 passed · 0 inconclusive

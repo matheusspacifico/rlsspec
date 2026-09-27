@@ -3,9 +3,9 @@ source: tests/session.rs
 expression: out.stdout
 ---
 notes
-  ✓ alice  select  rows: tenant_id = '…000a'       3 visible
-  ? alice  insert  values (id, tenant_id) → allow  not supported yet
-  ? alice  delete  deny                            not supported yet
+  ✓ alice  select  rows: tenant_id = '…000a'                     3 visible
+  ✗ alice  insert  values (id = 7, tenant_id = '…000a') → allow  denied: permission denied for table notes (SQLSTATE 42501)
+  ✓ alice  delete  deny                                          permission denied
 *
   ? alice  update  deny  not supported yet
-0 failed · 1 passed · 3 inconclusive
+1 failed · 2 passed · 1 inconclusive

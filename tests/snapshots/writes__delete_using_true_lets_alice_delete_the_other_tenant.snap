@@ -1,0 +1,8 @@
+---
+source: tests/writes.rs
+expression: "report(\"delete_using_true\", 1)"
+---
+notes
+  ✓ alice  delete  where tenant_id = '…000a' → allow  affected 3 of 3 rows
+  ✗ alice  delete  where tenant_id = '…000b' → deny   affected 3 of 3 rows (expected 0)
+1 failed · 1 passed · 0 inconclusive

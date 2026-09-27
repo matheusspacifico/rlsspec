@@ -69,7 +69,8 @@ role, so:
   at production.
 - While it runs, it holds row and table locks and an open transaction. On a busy database that can block other
   sessions.
-- Some effects can't be rolled back: sequence values, `dblink`/foreign-data-wrapper writes, and triggers with
+- Write checks really run `INSERT`, `UPDATE` and `DELETE`, so triggers fire and sequences advance. Some
+  effects can't be rolled back: sequence values, `dblink`/foreign-data-wrapper writes, and triggers with
   side effects outside the database.
 - `rlsspec.yaml` contains SQL that is executed as written. Only run specs you trust.
 - Reports can include primary keys of real rows.

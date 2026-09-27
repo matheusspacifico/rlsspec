@@ -1,0 +1,16 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [schema.sql, delete_using_true.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+  alice: 00000000-0000-4000-8000-0000000a11ce
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice}" } }
+  guest: { role: web_anon }
+expect:
+  notes:
+    alice:
+      delete:
+        - { where: "tenant_id = ${tenant_a}", expect: allow }
+        - { where: "tenant_id = ${tenant_b}", expect: deny }

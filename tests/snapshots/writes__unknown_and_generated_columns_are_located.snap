@@ -1,0 +1,17 @@
+---
+source: tests/writes.rs
+expression: out.stderr
+---
+error: column `tenant` not found in table notes
+  --> tests/fixtures/writes/columns.yaml:15:30
+   |
+15 |         - { values: { id: 7, tenant: "${tenant_a}", body: "x" }, expect: allow }
+   |                              ^
+
+error: column `body_length` of notes is generated and cannot be written
+  --> tests/fixtures/writes/columns.yaml:17:37
+   |
+17 |         - { where: "id = 1", set: { body_length: 3 }, expect: deny }
+   |                                     ^
+
+error: stopped before running any case (2 errors in tests/fixtures/writes/columns.yaml)

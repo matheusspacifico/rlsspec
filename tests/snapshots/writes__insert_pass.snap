@@ -1,0 +1,8 @@
+---
+source: tests/writes.rs
+expression: "report(\"insert_pass\", 0)"
+---
+notes
+  ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce', body = 'mine') → allow   inserted
+  ✓ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = 'theirs') → deny  permission denied
+0 failed · 2 passed · 0 inconclusive

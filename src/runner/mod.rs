@@ -1,4 +1,5 @@
 mod select;
+mod write;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -10,6 +11,7 @@ use crate::config::{
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session};
+use write::Modify;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RunError {
@@ -78,10 +80,10 @@ pub struct Totals {
 }
 
 impl Report {
-    fn push(&mut self, table: &str, block: &Block, op: Op, description: String, outcome: Outcome) {
+    fn push(&mut self, table: &str, identity: &str, op: Op, description: String, outcome: Outcome) {
         self.results.push(CaseResult {
             table: table.to_owned(),
-            identity: block.identity.clone(),
+            identity: identity.to_owned(),
             op,
             description,
             outcome,
@@ -121,6 +123,11 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
 
     let mut diagnostics = Vec::new();
     let tables = resolve_tables(config, &catalog, &mut diagnostics);
+    for (block, table) in config.expect.iter().chain(&config.defaults).zip(&tables) {
+        if let Some(table) = table {
+            check_columns(&block.ops, table, &catalog, &mut diagnostics);
+        }
+    }
     preflight(&mut session, &config.identities, &mut diagnostics)?;
     if !diagnostics.is_empty() {
         diagnostics.sort_by_key(|d| d.span);
@@ -136,30 +143,164 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
     let (expect_tables, default_tables) = tables.split_at(config.expect.len());
     let mut report = Report::default();
     for (block, table) in config.expect.iter().zip(expect_tables) {
-        let name = table_name(block, *table, &catalog);
-        if let (Some(case), Some(table)) = (&block.ops.select, table) {
-            let outcome = match identities.get(block.identity.as_str()) {
-                Some(identity) => {
-                    let at = Location(&source.path, case.span);
-                    session.case(|tx| select::check(tx, table, identity, &case.select, at))??
-                }
-                None => Outcome::Inconclusive(format!("unknown identity `{}`", block.identity)),
-            };
-            let description = select::describe(&case.select);
-            report.push(&name, block, Op::Select, description, outcome);
-        }
-        unsupported_writes(&name, block, &mut report);
+        let (Some(table), Some(identity)) = (table, identities.get(block.identity.as_str())) else {
+            continue;
+        };
+        let cell = Cell {
+            table,
+            name: catalog.display_name(table),
+            identity,
+            path: &source.path,
+        };
+        cell.check(&mut session, &block.ops, &mut report)?;
     }
     for (block, table) in config.defaults.iter().zip(default_tables) {
         let name = table_name(block, *table, &catalog);
         if let Some(case) = &block.ops.select {
             let description = select::describe(&case.select);
-            report.push(&name, block, Op::Select, description, Outcome::Unsupported);
+            report.push(
+                &name,
+                &block.identity,
+                Op::Select,
+                description,
+                Outcome::Unsupported,
+            );
         }
         unsupported_writes(&name, block, &mut report);
     }
     session.rollback()?;
     Ok(report)
+}
+
+struct Cell<'a> {
+    table: &'a Table,
+    name: String,
+    identity: &'a Identity,
+    path: &'a Path,
+}
+
+impl Cell<'_> {
+    fn at(&self, span: Span) -> Location<'_> {
+        Location(self.path, span)
+    }
+
+    fn push(&self, report: &mut Report, op: Op, description: String, outcome: Outcome) {
+        report.push(&self.name, &self.identity.name, op, description, outcome);
+    }
+
+    fn check(&self, session: &mut Session, ops: &Ops, report: &mut Report) -> Result<(), RunError> {
+        let (table, identity) = (self.table, self.identity);
+        if let Some(case) = &ops.select {
+            let at = self.at(case.span);
+            let outcome =
+                session.case(|tx| select::check(tx, table, identity, &case.select, at))??;
+            self.push(report, Op::Select, select::describe(&case.select), outcome);
+        }
+        match &ops.insert {
+            Some(Writes::Shorthand { expect, .. }) => {
+                let description = write::expectation(*expect).to_owned();
+                self.push(report, Op::Insert, description, Outcome::Unsupported);
+            }
+            Some(Writes::Cases(cases)) => {
+                for case in cases {
+                    let at = self.at(case.span);
+                    let outcome =
+                        session.case(|tx| write::insert(tx, table, identity, case, at))??;
+                    self.push(report, Op::Insert, write::describe_insert(case), outcome);
+                }
+            }
+            None => {}
+        }
+        match &ops.update {
+            Some(Writes::Shorthand { expect, span }) => {
+                let at = self.at(*span);
+                let outcome = session.case(|tx| {
+                    write::modify(tx, table, identity, Modify::Update(None), None, *expect, at)
+                })??;
+                let description = write::expectation(*expect).to_owned();
+                self.push(report, Op::Update, description, outcome);
+            }
+            Some(Writes::Cases(cases)) => {
+                for case in cases {
+                    let at = self.at(case.span);
+                    let set = case.set.as_deref();
+                    let outcome = session.case(|tx| {
+                        let kind = Modify::Update(set);
+                        write::modify(
+                            tx,
+                            table,
+                            identity,
+                            kind,
+                            Some(&case.predicate),
+                            case.expect,
+                            at,
+                        )
+                    })??;
+                    let description = write::describe_modify(&case.predicate, set, case.expect);
+                    self.push(report, Op::Update, description, outcome);
+                }
+            }
+            None => {}
+        }
+        match &ops.delete {
+            Some(Writes::Shorthand { expect, span }) => {
+                let at = self.at(*span);
+                let outcome = session.case(|tx| {
+                    write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
+                })??;
+                let description = write::expectation(*expect).to_owned();
+                self.push(report, Op::Delete, description, outcome);
+            }
+            Some(Writes::Cases(cases)) => {
+                for case in cases {
+                    let at = self.at(case.span);
+                    let outcome = session.case(|tx| {
+                        let predicate = Some(case.predicate.as_str());
+                        write::modify(
+                            tx,
+                            table,
+                            identity,
+                            Modify::Delete,
+                            predicate,
+                            case.expect,
+                            at,
+                        )
+                    })??;
+                    let description = write::describe_modify(&case.predicate, None, case.expect);
+                    self.push(report, Op::Delete, description, outcome);
+                }
+            }
+            None => {}
+        }
+        Ok(())
+    }
+}
+
+/// Every column in `values` and `set` must exist and be writable (not generated).
+fn check_columns(ops: &Ops, table: &Table, catalog: &Catalog, diagnostics: &mut Vec<Diagnostic>) {
+    let inserts = match &ops.insert {
+        Some(Writes::Cases(cases)) => cases.iter().map(|c| c.values.as_slice()).collect(),
+        _ => Vec::new(),
+    };
+    let updates = match &ops.update {
+        Some(Writes::Cases(cases)) => cases.iter().filter_map(|c| c.set.as_deref()).collect(),
+        _ => Vec::new(),
+    };
+    let name = catalog.display_name(table);
+    for assignment in inserts.into_iter().chain(updates).flatten() {
+        let message = match table.column(&assignment.column) {
+            None => format!("column `{}` not found in table {name}", assignment.column),
+            Some(column) if column.generated => format!(
+                "column `{}` of {name} is generated and cannot be written",
+                assignment.column
+            ),
+            Some(_) => continue,
+        };
+        diagnostics.push(Diagnostic {
+            span: assignment.span,
+            message,
+        });
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -233,7 +374,13 @@ fn unsupported_writes(table: &str, block: &Block, report: &mut Report) {
         ..
     } = &block.ops;
     let mut push = |op, description| {
-        report.push(table, block, op, description, Outcome::Unsupported);
+        report.push(
+            table,
+            &block.identity,
+            op,
+            description,
+            Outcome::Unsupported,
+        );
     };
     match insert {
         Some(Writes::Shorthand { expect, .. }) => push(Op::Insert, expectation(*expect).into()),

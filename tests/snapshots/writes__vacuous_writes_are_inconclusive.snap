@@ -1,0 +1,9 @@
+---
+source: tests/writes.rs
+expression: "report(\"vacuous\", 2)"
+---
+notes
+  ? alice  update  where id > 100 → deny  vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/writes/vacuous.yaml:15:11)
+drafts
+  ? alice  delete  deny  vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup (tests/fixtures/writes/vacuous.yaml:17:22)
+0 failed · 0 passed · 2 inconclusive

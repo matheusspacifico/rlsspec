@@ -1,0 +1,8 @@
+---
+source: tests/writes.rs
+expression: "report(\"delete_pass\", 0)"
+---
+notes
+  ✓ alice  delete  where tenant_id = '…000a' → allow  affected 3 of 3 rows
+  ✓ alice  delete  where tenant_id = '…000b' → deny   affected 0 of 3 rows
+0 failed · 2 passed · 0 inconclusive

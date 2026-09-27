@@ -1,0 +1,9 @@
+---
+source: tests/writes.rs
+expression: "report(\"update_author_only\", 1)"
+---
+notes
+  ✗ alice  update  where tenant_id = '…000a' → allow                         affected 2 of 3 rows (expected 3)
+  ✓ alice  update  where tenant_id = '…000b' → deny                          affected 0 of 3 rows
+  ✓ alice  update  where tenant_id = '…000a' set tenant_id = '…000b' → deny  permission denied
+1 failed · 2 passed · 0 inconclusive
