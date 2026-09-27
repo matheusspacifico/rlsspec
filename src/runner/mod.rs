@@ -1,6 +1,6 @@
 pub mod coverage;
 mod insert_deny;
-mod plan;
+pub(crate) mod plan;
 mod select;
 mod write;
 
@@ -122,34 +122,57 @@ impl Report {
     }
 }
 
+/// How `in_session` checks the identities before handing over: by applying each one, or, for
+/// `lint`, which never acts as an identity, only by checking that its role exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Preflight {
+    Apply,
+    RolesExist,
+}
+
 pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
-    in_session(config, source, |session, catalog, plan| {
-        let mut report = Report {
-            results: Vec::new(),
-            coverage: coverage::compute(config, catalog, plan),
-        };
-        for entry in plan {
-            let cell = Cell {
-                entry,
-                name: catalog.display_name(entry.table),
-                path: &source.path,
+    in_session(
+        config,
+        source,
+        Preflight::Apply,
+        |session, catalog, plan| {
+            let mut report = Report {
+                results: Vec::new(),
+                coverage: coverage::compute(config, catalog, plan),
             };
-            cell.check(session, &mut report)?;
-        }
-        Ok(report)
-    })
+            for entry in plan {
+                let cell = Cell {
+                    entry,
+                    name: catalog.display_name(entry.table),
+                    path: &source.path,
+                };
+                cell.check(session, &mut report)?;
+            }
+            Ok(report)
+        },
+    )
 }
 
 /// Everything `run` does before the first case (setup, catalog, spec validation), then the coverage.
 pub fn cover(config: &Config, source: &Source) -> Result<Coverage, RunError> {
-    in_session(config, source, |_, catalog, plan| {
+    in_session(config, source, Preflight::Apply, |_, catalog, plan| {
         Ok(coverage::compute(config, catalog, plan))
     })
+}
+
+/// Everything `cover` does, except that no identity is applied: their roles must only exist.
+pub(crate) fn inspect<T>(
+    config: &Config,
+    source: &Source,
+    f: impl FnOnce(&mut Session, &Catalog, &[plan::Entry]) -> Result<T, RunError>,
+) -> Result<T, RunError> {
+    in_session(config, source, Preflight::RolesExist, f)
 }
 
 fn in_session<T>(
     config: &Config,
     source: &Source,
+    preflight: Preflight,
     f: impl FnOnce(&mut Session, &Catalog, &[plan::Entry]) -> Result<T, RunError>,
 ) -> Result<T, RunError> {
     let mut client = pg::connect(&config.database.url)?;
@@ -163,7 +186,10 @@ fn in_session<T>(
     for entry in &plan {
         check_columns(entry, &catalog, &mut diagnostics);
     }
-    preflight(&mut session, &config.identities, &mut diagnostics)?;
+    match preflight {
+        Preflight::Apply => apply_identities(&mut session, &config.identities, &mut diagnostics)?,
+        Preflight::RolesExist => check_roles(&mut session, &config.identities, &mut diagnostics)?,
+    }
     if !diagnostics.is_empty() {
         diagnostics.sort_by_key(|d| d.span);
         diagnostics.dedup();
@@ -374,7 +400,7 @@ fn resolve_tables<'c>(
         .collect()
 }
 
-fn preflight(
+fn apply_identities(
     session: &mut Session,
     identities: &[Identity],
     diagnostics: &mut Vec<Diagnostic>,
@@ -390,6 +416,25 @@ fn preflight(
                 ),
             });
         }
+    }
+    Ok(())
+}
+
+fn check_roles(
+    session: &mut Session,
+    identities: &[Identity],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<(), RunError> {
+    let roles: Vec<&str> = identities.iter().map(|i| i.role.as_str()).collect();
+    let missing = catalog::lint::missing_roles(session.tx(), &roles)?;
+    for identity in identities.iter().filter(|i| missing.contains(&i.role)) {
+        diagnostics.push(Diagnostic {
+            span: identity.span,
+            message: format!(
+                "role `{}` of identity `{}` does not exist",
+                identity.role, identity.name
+            ),
+        });
     }
     Ok(())
 }

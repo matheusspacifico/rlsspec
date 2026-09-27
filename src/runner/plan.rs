@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use super::Origin;
 use crate::catalog::{Catalog, Table};
 use crate::config::{
-    Block, Config, DeleteCase, Diagnostic, Identity, InsertCase, SelectCase, Span, Spec, TableRef,
-    UpdateCase, Writes,
+    Block, Config, DeleteCase, Diagnostic, Expectation, Identity, InsertCase, Select, SelectCase,
+    Span, Spec, TableRef, UpdateCase, Writes,
 };
 
 /// Everything to check for one identity on one table, each operation taken from the most
@@ -30,6 +30,39 @@ impl Entry<'_> {
             given(self.update),
             given(self.delete),
         ]
+    }
+
+    /// Whether every operation is denied: `select: deny`, and for each write the `deny` shorthand
+    /// or only `expect: deny` cases. A `todo` or missing operation is not a deny.
+    pub fn denies_everything(&self) -> bool {
+        fn writes<C>(
+            op: Option<(&Spec<Writes<C>>, Origin)>,
+            expect: fn(&C) -> Expectation,
+        ) -> bool {
+            match op {
+                Some((Spec::Given(Writes::Shorthand { expect, .. }), _)) => {
+                    *expect == Expectation::Deny
+                }
+                Some((Spec::Given(Writes::Cases(cases)), _)) => {
+                    cases.iter().all(|c| expect(c) == Expectation::Deny)
+                }
+                Some((Spec::Todo, _)) | None => false,
+            }
+        }
+        let select = matches!(
+            self.select,
+            Some((
+                Spec::Given(SelectCase {
+                    select: Select::Deny,
+                    ..
+                }),
+                _
+            ))
+        );
+        select
+            && writes(self.insert, |c| c.expect)
+            && writes(self.update, |c| c.expect)
+            && writes(self.delete, |c| c.expect)
     }
 }
 

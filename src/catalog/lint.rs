@@ -141,7 +141,7 @@ WITH views AS (
                         WHERE opt.option_name = 'security_invoker'), false)
 )
 SELECT v.schema, v.name, v.materialized, v.owner, v.owner_bypasses,
-       coalesce(array_agg(t.oid::regclass::text ORDER BY t.oid::regclass::text)
+       coalesce(array_agg(DISTINCT t.oid::regclass::text ORDER BY t.oid::regclass::text)
                 FILTER (WHERE pg_has_role(v.relowner, t.relowner, 'USAGE')), '{}')
 FROM views v
 JOIN pg_rewrite r ON r.ev_class = v.oid
