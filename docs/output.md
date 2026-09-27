@@ -32,8 +32,9 @@ $ rlsspec lint --format json > lint.json
 
 When a run has both failures and inconclusive cases, `2` wins. Lint warnings and info findings never fail.
 A case is *inconclusive* when it couldn't give a verdict: a check that can't fail (an empty table, a predicate
-matching no row), an SQL error other than a permission error (a NOT NULL or foreign key violation, a
-timeout), or a case of a kind this version can't run yet.
+matching no row), an SQL error other than a permission error on the target table (a NOT NULL or foreign key
+violation, a timeout, a permission error raised by a trigger or function, such as an audit trigger's own
+insert), or a case of a kind this version can't run yet.
 
 ## JSON
 
@@ -93,7 +94,7 @@ One pretty-printed document per run. `schema_version` comes first, then `command
 | `cases[].origin` | string | `expect` or `default` |
 | `cases[].description` | string | What the case checks, literals in full (`rows: …`, `where … → deny`, `deny`) |
 | `cases[].outcome` | string | `pass`, `fail` or `inconclusive` |
-| `cases[].detail` | string | The result (`12 visible`, `affected 3 of 3 rows (expected 0)`, the SQL error) |
+| `cases[].detail` | string | The result (`12 visible`, `leaked 2 of the 4 rows it should not see: id=5, id=6`, `affected 3 of 3 rows (expected 0)`, the SQL error) |
 | `cases[].location` | object | `{file, line, column}` of the YAML node the case comes from. For `defaults`, the default's entry, shared by every table it expands to. Every case has one |
 | `coverage.policy` | string | `ignore`, `warn` or `fail` (the spec's `unspecified`) |
 | `coverage.total`, `.specified`, `.unspecified` | integer | Cells (identity × table × operation) |
@@ -159,7 +160,7 @@ One pretty-printed document per run. `schema_version` comes first, then `command
 |---|---|---|
 | `findings` | array | In the text report's order (by rule) |
 | `findings[].rule` | string | `RLS001` … `RLS008` (open: new rules add IDs) |
-| `findings[].severity` | string | `error`, `warn` or `info` |
+| `findings[].severity` | string | `error`, `warn` or `info`. Usually fixed per rule; RLS001 is `info` instead of `error` when no identity role holds a privilege on the table |
 | `findings[].object` | string | As printed: a table, `schema.function(args)`, `schema.view`, a role (RLS003), or `file:line` for a stale ignore |
 | `findings[].role` | string or null | The identity role concerned, when there is one |
 | `findings[].hint` | string | One-line explanation and fix |

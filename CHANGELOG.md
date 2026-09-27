@@ -6,6 +6,34 @@ All notable changes to rlsspec are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.1] - Unreleased
+
+A correctness and polish release, from running v0.1.0 against two real projects. No new spec key.
+
+### Fixed
+
+- **A write rejected by a trigger no longer counts as denied.** A permission error (`42501`) raised by a nested
+  statement, such as an AFTER INSERT audit trigger whose own insert into another RLS table is rejected, passed
+  an `insert`, `update` or `delete` case expecting `deny` even when the target's policy let the row through.
+  A deny now counts only when the error is about the target table (no error context, and the message names the
+  table or its schema); anything else is inconclusive (exit 2) with the Postgres message and the trigger or
+  function it came from. A spec that passed only because of such a trigger now exits 2.
+- The `insert: deny` shorthand no longer counts a permissive policy whose check is `false`
+  (`WITH CHECK (false)`, or `USING (false)` on an `ALL` policy without a check) as letting rows in.
+- Lint RLS005 skips functions that belong to an extension, such as `pg_graphql`'s on every Supabase project.
+- Folded `defaults` lines show `?` when an op is inconclusive and none failed, and `✗?` when the line has both.
+
+### Changed
+
+- Lint RLS001 is `info` instead of `error` when no identity role holds a privilege on the table (migration
+  bookkeeping tables), and its hint names the roles that see every row.
+- A failing `setup` statement is reported at `file:line:column`, from the Postgres error position or the start
+  of the statement, with its ordinal in the file and the source line.
+- Select failures read `leaked 2 of the 4 rows it should not see` and `hidden 1 of the 3 rows it should see`
+  (text and the JSON `detail`, which is free text under `schema_version: 1`).
+
+## [0.1.0] - 2026-09-27
+
 The first release: check Postgres Row Level Security against a spec of the access you intend.
 
 ### Added
@@ -51,4 +79,6 @@ The first release: check Postgres Row Level Security against a spec of the acces
   (`ghcr.io/matheusspacifico/rlsspec`) and a GitHub Action (`matheusspacifico/rlsspec`).
 - Two runnable examples: `examples/multitenant` (plain Postgres) and `examples/supabase-todo`.
 
-[Unreleased]: https://github.com/matheusspacifico/rlsspec/commits/main
+[Unreleased]: https://github.com/matheusspacifico/rlsspec/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/matheusspacifico/rlsspec/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/matheusspacifico/rlsspec/releases/tag/v0.1.0

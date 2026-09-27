@@ -58,7 +58,8 @@ coverage 8/8 cells (100.0%) · 0 unspecified (warn)
 - **Safe by construction**: everything runs in one transaction that is always rolled back; remote hosts are
   refused unless explicitly allowed.
 - **No false passes**: a check that can't fail (empty table, predicate matching nothing) is an error, and only a
-  real permission error or zero affected rows counts as "denied".
+  permission error on the table itself or zero affected rows counts as "denied": a write rejected by something
+  else, such as an audit trigger's own insert, is inconclusive.
 - **Defaults**: `"*": { select: deny, … }` for an identity, overridden per table.
 - **Coverage** of identities × tables × operations after every run, with `unspecified: fail` to break CI when
   a new table has no spec; `rlsspec cover` prints the matrix without running anything.
@@ -258,7 +259,7 @@ gain rules, so `rlsspec lint` can report findings it didn't before.
 | `select: all` | it sees every row |
 | `select: { rows: "<sql>" }` | it sees exactly the rows where the predicate holds (`subset: true`: at most those) |
 | `insert: [{ values: {…}, expect: allow\|deny }]` | the row is inserted / rejected with a permission error |
-| `insert: deny` | the catalog proves no insert can succeed (no privilege, or no permissive policy applies) |
+| `insert: deny` | the catalog proves no insert can succeed (no privilege, or no permissive policy applies; one whose check is `false` doesn't count) |
 | `update: [{ where: "<sql>", set?: {…}, expect: allow\|deny }]` | every / none of the rows matching `where` are updated |
 | `delete: [{ where: "<sql>", expect: allow\|deny }]` | every / none of the rows matching `where` are deleted |
 | `update: allow\|deny`, `delete: allow\|deny` | the same, over every row of the table |
@@ -306,18 +307,18 @@ identity is applied. It checks the roles of your identities, so a role no identi
 
 | Rule | Severity | Finding |
 |---|---|---|
-| RLS001 | error | A table in scope without RLS enabled |
+| RLS001 | error | A table in scope without RLS enabled; info when no identity's role holds a privilege on it |
 | RLS002 | error | RLS enabled but not forced, on a table an identity's role owns (the owner bypasses RLS) |
 | RLS003 | error | An identity's role is superuser or has `BYPASSRLS` |
 | RLS004 | warn | A permissive `INSERT`/`UPDATE`/`DELETE`/`ALL` policy for an identity's role with `USING (true)` or `WITH CHECK (true)` |
-| RLS005 | warn | A `SECURITY DEFINER` function an identity's role can execute, without a pinned `search_path` |
+| RLS005 | warn | A `SECURITY DEFINER` function an identity's role can execute, without a pinned `search_path` (functions that belong to an extension are left out) |
 | RLS006 | info | RLS enabled with no policy: everything is denied (often intended, sometimes a forgotten migration) |
 | RLS007 | warn | A view readable by an identity's role that reads RLS tables as its owner (a superuser, `BYPASSRLS` or the tables' owner) without `security_invoker`, or a readable materialized view over RLS tables (PostgreSQL 15+) |
 | RLS008 | warn | An identity denied every operation on a table in the spec, whose role still holds privileges on it (when every identity with that role is denied everything there) |
 
 ```console
 $ rlsspec lint
-✗ RLS001  tags                row level security is not enabled: every role with a grant sees every row
+✗ RLS001  tags                row level security is not enabled: app sees every row
 ! RLS004  notes          app  permissive UPDATE policy `anyone_edits` has USING (true): it allows every row
 ! RLS005  public.leak()  app  SECURITY DEFINER without a pinned search_path: add SET search_path = ''
 1 error · 2 warnings · 0 info · 1 ignored
