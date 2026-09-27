@@ -7,7 +7,6 @@ use std::process::Command;
 use std::sync::{Arc, Mutex, Weak};
 
 use common::{Db, Output};
-use postgres::{Client, NoTls};
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::core::ExecCommand;
 use testcontainers_modules::testcontainers::runners::SyncRunner;
@@ -63,11 +62,9 @@ fn server() -> Arc<Server> {
         path
     };
     let (ca, other_ca) = (copy("ca.pem"), copy("other.pem"));
-    Client::connect(
-        &format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres"),
-        NoTls,
-    )
-    .unwrap()
+    common::connect_when_ready(&format!(
+        "postgres://postgres:postgres@127.0.0.1:{port}/postgres"
+    ))
     .batch_execute("CREATE ROLE app")
     .unwrap();
     let server = Arc::new(Server {

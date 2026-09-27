@@ -4,6 +4,8 @@ use std::env;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use postgres::{Client, NoTls};
 use testcontainers_modules::postgres::Postgres;
@@ -38,7 +40,7 @@ fn server() -> Arc<Server> {
         _container: container,
         port,
     });
-    connect(&url(port, "postgres", "postgres", "postgres"))
+    connect_when_ready(&url(port, "postgres", "postgres", "postgres"))
         .batch_execute(ROLES)
         .unwrap();
     *shared = Arc::downgrade(&server);
@@ -51,6 +53,22 @@ fn url(port: u16, user: &str, password: &str, db: &str) -> String {
 
 fn connect(url: &str) -> Client {
     Client::connect(url, NoTls).unwrap()
+}
+
+/// The first connection to a fresh container. Its "ready" log line can come a moment before the server
+/// accepts TCP connections, so retry for a few seconds and give up with the last error.
+pub fn connect_when_ready(url: &str) -> Client {
+    const GIVE_UP: Duration = Duration::from_secs(15);
+    let start = Instant::now();
+    loop {
+        match Client::connect(url, NoTls) {
+            Ok(client) => return client,
+            Err(e) if start.elapsed() >= GIVE_UP => {
+                panic!("no connection to the test container after {GIVE_UP:?}: {e:?}")
+            }
+            Err(_) => thread::sleep(Duration::from_millis(250)),
+        }
+    }
 }
 
 pub struct Output {
