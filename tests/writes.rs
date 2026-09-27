@@ -110,3 +110,8 @@ fn two_blocks_for_the_same_table_and_identity_are_located() {
     assert_eq!(out.stdout, "");
     insta::assert_snapshot!(out.stderr);
 }
+
+#[test]
+fn only_a_constant_update_over_every_row_sees_past_the_select_policies() {
+    insta::assert_snapshot!(report("update_hidden_by_select", 1));
+}

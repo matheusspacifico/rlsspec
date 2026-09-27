@@ -1,0 +1,18 @@
+# Statements that read a column also apply the SELECT policies, which hide the other tenant's notes:
+# only `where: "true"` with a constant `set` reaches them, and catches the USING (true) UPDATE policy.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [schema.sql, update_hidden_by_select.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}" } }
+unspecified: ignore
+expect:
+  notes:
+    alice:
+      update:
+        - { where: "tenant_id = ${tenant_b}", expect: deny }
+        - { where: "tenant_id = ${tenant_b}", set: { body: "x" }, expect: deny }
+        - { where: "true", set: { body: "x" }, expect: deny }
