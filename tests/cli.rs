@@ -168,3 +168,22 @@ fn cover_has_no_junit_report() {
         out.stderr
     );
 }
+
+#[test]
+fn init_refuses_remote_hosts_without_tls() {
+    let output = format!("{}/init_insecure.yaml", env!("CARGO_TARGET_TMPDIR"));
+    let out = rlsspec_with_env(
+        &["init", "--allow-remote", "-o", &output],
+        &[(
+            "DATABASE_URL",
+            "postgres://u:secret@db.example.com/app?sslmode=disable",
+        )],
+    );
+    assert_eq!(out.code, Some(2));
+    assert_eq!(
+        out.stderr,
+        "error: refusing to connect to non-local host `db.example.com` without TLS (sslmode=disable); use sslmode=require or stronger, or pass --allow-insecure
+"
+    );
+    assert!(!std::path::Path::new(&output).exists());
+}

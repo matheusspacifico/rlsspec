@@ -109,6 +109,12 @@ impl Target {
             root_cert,
         })
     }
+
+    /// Upgrades `prefer` (or `disable`) to `require`: encrypted, or no connection at all.
+    pub fn require_tls(&mut self) {
+        self.ssl_mode = SslMode::Require;
+        self.config.ssl_mode(postgres::config::SslMode::Require);
+    }
 }
 
 const TLS_KEYS: [&str; 2] = ["sslmode", "sslrootcert"];

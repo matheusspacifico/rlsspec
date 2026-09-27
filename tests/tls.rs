@@ -1,9 +1,12 @@
+mod common;
+
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, Mutex, Weak};
 
+use common::{Db, Output};
 use postgres::{Client, NoTls};
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::core::ExecCommand;
@@ -77,12 +80,6 @@ fn server() -> Arc<Server> {
     server
 }
 
-struct Output {
-    code: Option<i32>,
-    stdout: String,
-    stderr: String,
-}
-
 impl Server {
     /// A URL for `host` (reached through hostaddr=127.0.0.1 when it isn't an address) with `params`.
     fn url(&self, host: &str, params: &str) -> String {
@@ -122,16 +119,21 @@ fn connects(out: &Output) {
     assert!(out.stdout.contains("coverage 4/4 cells"), "{}", out.stdout);
 }
 
+/// A connection error, after any warning the safety guard printed.
 fn refused_connection(out: &Output, reason: &str) {
     assert_eq!(out.code, Some(2), "{}", out.stdout);
     assert_eq!(out.stdout, "");
+    let error = out
+        .stderr
+        .lines()
+        .find(|line| !line.starts_with("warning: "))
+        .unwrap_or_default();
     assert!(
-        out.stderr
-            .starts_with("error: cannot connect to the database: "),
+        error.starts_with("error: cannot connect to the database: "),
         "{}",
         out.stderr
     );
-    assert!(out.stderr.contains(reason), "{}", out.stderr);
+    assert!(error.contains(reason), "{}", out.stderr);
 }
 
 #[test]
@@ -153,7 +155,9 @@ fn require_encrypts_without_verifying_the_certificate() {
 fn disable_stays_plain() {
     let server = server();
     let url = server.url("127.0.0.1", "sslmode=disable");
-    connects(&server.cover(PLAIN, &url, &[]));
+    let out = server.cover(PLAIN, &url, &[]);
+    connects(&out);
+    assert_eq!(out.stderr, "");
 }
 
 #[test]
@@ -224,5 +228,78 @@ fn unsupported_tls_settings_are_config_errors() {
     assert_eq!(
         error("sslmode=verify-full&sslrootcert=tests/fixtures/tls/encrypted.sql"),
         "error: no certificate found in sslrootcert tests/fixtures/tls/encrypted.sql\n"
+    );
+}
+
+// The remote-host policy, exercised through `safety.allowed_hosts`: the fixtures list db.rlsspec.test,
+// which the URLs point at 127.0.0.1 with `hostaddr`, so the guard sees a non-local host.
+
+#[test]
+fn a_listed_remote_host_is_refused_without_tls() {
+    let server = server();
+    let url = server.url("db.rlsspec.test", "sslmode=disable");
+    let out = server.cover(PLAIN, &url, &[]);
+    assert_eq!(out.code, Some(2));
+    assert_eq!(out.stdout, "");
+    assert_eq!(
+        out.stderr,
+        "error: refusing to connect to non-local host `db.rlsspec.test` without TLS (sslmode=disable); use sslmode=require or stronger, or pass --allow-insecure\n"
+    );
+
+    let out = server.cover(PLAIN, &url, &["--allow-insecure"]);
+    connects(&out);
+    assert_eq!(
+        out.stderr,
+        "warning: connecting to non-local host `db.rlsspec.test` without TLS (--allow-insecure)\n"
+    );
+
+    let out = server.cover(
+        ENCRYPTED,
+        &server.url("db.rlsspec.test", "sslmode=require"),
+        &[],
+    );
+    connects(&out);
+    assert_eq!(out.stderr, "");
+}
+
+#[test]
+fn prefer_becomes_require_for_a_remote_host() {
+    // The shared test server has no TLS: a local host falls back to plain, a remote one must not.
+    let db = Db::new();
+    let local = db.url("postgres", "postgres");
+    let out = db.rlsspec_with_url(&["cover", "-c", PLAIN], &local);
+    connects(&out);
+    assert_eq!(out.stderr, "");
+
+    let remote = format!(
+        "{}?hostaddr=127.0.0.1",
+        local.replace("@127.0.0.1:", "@db.rlsspec.test:")
+    );
+    refused_connection(
+        &db.rlsspec_with_url(&["cover", "-c", PLAIN], &remote),
+        "server does not support TLS",
+    );
+
+    let out = db.rlsspec_with_url(&["cover", "-c", PLAIN, "--allow-insecure"], &remote);
+    connects(&out);
+    assert_eq!(
+        out.stderr,
+        "warning: connecting to non-local host `db.rlsspec.test` without TLS if it doesn't offer it (sslmode=prefer, --allow-insecure)\n"
+    );
+}
+
+#[test]
+fn allow_remote_warns_with_the_host_only() {
+    let server = server();
+    let ca = format!("sslrootcert={}", server.ca.display());
+    let url = server
+        .url("localhost", &format!("sslmode=verify-ca&{ca}"))
+        .replace("@localhost:", "@elsewhere.rlsspec.test:")
+        .replace("/postgres?", "/postgres?hostaddr=127.0.0.1&");
+    let out = server.cover(ENCRYPTED, &url, &["--allow-remote"]);
+    connects(&out);
+    assert_eq!(
+        out.stderr,
+        "warning: connecting to non-local host `elsewhere.rlsspec.test` (--allow-remote)\n"
     );
 }

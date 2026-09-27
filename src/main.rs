@@ -28,6 +28,10 @@ struct Cli {
     #[arg(long, global = true)]
     allow_remote: bool,
 
+    /// Allow a non-local host without TLS (sslmode=disable, or prefer without upgrading it to require)
+    #[arg(long, global = true)]
+    allow_insecure: bool,
+
     /// Disable coloured output (also off when not a terminal or when NO_COLOR is set)
     #[arg(long, global = true)]
     no_color: bool,
@@ -175,8 +179,7 @@ fn init(
     let Ok(url) = env::var("DATABASE_URL") else {
         bail!("`DATABASE_URL` is not set; init reads the database to scaffold the spec from it");
     };
-    let target = Target::parse(&url)?;
-    safety::check(&target, &[], cli.allow_remote)?;
+    let target = guard(cli, &url, &[])?;
     let scaffold = init::introspect(&target, schemas, preset)?;
     init::write(output, &init::render(&scaffold), force)?;
     println!(
@@ -198,9 +201,22 @@ fn preset(name: &str) -> Result<Preset, String> {
 
 fn load(cli: &Cli) -> Result<(Config, Source, Target)> {
     let (config, source) = config::load(&cli.config)?;
-    let target = Target::parse(&config.database.url)?;
-    safety::check(&target, &config.safety.allowed_hosts, cli.allow_remote)?;
+    let target = guard(cli, &config.database.url, &config.safety.allowed_hosts)?;
     Ok((config, source, target))
+}
+
+/// Parses `url` and applies the safety guard, printing a warning for each override it relied on.
+fn guard(cli: &Cli, url: &str, allowed_hosts: &[String]) -> Result<Target> {
+    let allow = safety::Allow {
+        remote: cli.allow_remote,
+        insecure: cli.allow_insecure,
+    };
+    let (target, warnings) = safety::check(Target::parse(url)?, allowed_hosts, allow)?;
+    let (warning, emphasis) = (style::WARNING, style::EMPHASIS);
+    for text in warnings {
+        anstream::eprintln!("{warning}warning{warning:#}{emphasis}:{emphasis:#} {text}");
+    }
+    Ok(target)
 }
 
 fn located(err: &anyhow::Error) -> Option<&ConfigError> {

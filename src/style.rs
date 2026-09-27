@@ -1,6 +1,7 @@
 use anstyle::{AnsiColor, Style};
 
 pub const ERROR: Style = AnsiColor::Red.on_default().bold();
+pub const WARNING: Style = AnsiColor::Yellow.on_default().bold();
 pub const EMPHASIS: Style = Style::new().bold();
 pub const GUTTER: Style = AnsiColor::Blue.on_default().bold();
 pub const PASS: Style = AnsiColor::Green.on_default();
