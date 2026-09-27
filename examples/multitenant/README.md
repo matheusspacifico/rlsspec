@@ -27,7 +27,15 @@ $ docker compose up -d --wait
 $ export DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres
 $ rlsspec test
 ...
+coverage 64/64 cells (100.0%) · 0 unspecified (warn)
 0 failed · 89 passed · 0 inconclusive
+$ rlsspec cover
+               anon  ana   ben   cleo
+organizations  SIUD  SIUD  SIUD  SIUD
+memberships    SIUD  SIUD  SIUD  SIUD
+projects       SIUD  SIUD  SIUD  SIUD
+tasks          SIUD  SIUD  SIUD  SIUD
+coverage 64/64 cells (100.0%) · 0 unspecified (warn)
 ```
 
 `schema.sql` and `policies.sql` are applied when the container starts, like migrations. `seed.sql` is
@@ -41,6 +49,7 @@ $ rlsspec test
 ...
 tasks
   ✗ ben   delete  where org_id = '…ac3e' and created_by <> '…0b0b' → deny                                        affected 2 of 2 rows (expected 0)
+coverage 64/64 cells (100.0%) · 0 unspecified (warn)
 1 failed · 88 passed · 0 inconclusive
 ```
 

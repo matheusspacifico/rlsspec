@@ -44,6 +44,7 @@ documents
   ✗ alice  update  where tenant_id = '…000b' → deny                    affected 3 of 3 rows (expected 0)
   ✓ alice  delete  deny                                                permission denied
   ✓ guest  *       deny                                                4/4 ops
+coverage 8/8 cells (100.0%) · 0 unspecified (warn)
 1 failed · 5 passed · 0 inconclusive
 ```
 
@@ -62,13 +63,14 @@ Working now:
 - **No false passes**: a check that can't fail (empty table, predicate matching nothing) is an error, and only a
   real permission error or zero affected rows counts as "denied".
 - **Defaults**: `"*": { select: deny, … }` for an identity, overridden per table.
+- **Coverage** of identities × tables × operations after every run, with `unspecified: fail` to break CI when
+  a new table has no spec; `rlsspec cover` prints the matrix without running anything.
+- **`rlsspec init`** scaffolds a spec from the database, every cell marked `todo`.
 - **Vendor-neutral**: an identity is a Postgres role + session settings (GUCs), so it fits any RLS design.
 - **CI-friendly** exit codes: `0` all good, `1` failures, `2` config/connection errors or inconclusive cases.
 
 Planned for v0.1:
 
-- **Coverage matrix** of identities × tables × operations, with an option to fail CI when a new table has no
-  spec; `rlsspec init` to scaffold a spec from the database.
 - A **`supabase` preset** that maps JWT claims so `auth.uid()` and friends just work.
 - **Lint** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`, unsafe
   `SECURITY DEFINER` functions, views that bypass RLS.
@@ -106,7 +108,10 @@ $ rlsspec test
 
 ### Write your own spec
 
-Create `rlsspec.yaml` next to your project (or pass `-c path/to/spec.yaml`):
+Start from your database: `rlsspec init` writes `rlsspec.yaml` with one identity per role that has privileges
+on your tables and every identity × table × operation marked `todo` (it reads `DATABASE_URL`; `--schemas`,
+`-o` and `--force` change what it reads and writes). Or write it by hand (`-c path/to/spec.yaml` to use
+another path):
 
 ```yaml
 version: 1
@@ -144,11 +149,23 @@ Then run `rlsspec test`. The rows your checks need must exist: put them in the d
 | `update: [{ where: "<sql>", set?: {…}, expect: allow\|deny }]` | every / none of the rows matching `where` are updated |
 | `delete: [{ where: "<sql>", expect: allow\|deny }]` | every / none of the rows matching `where` are deleted |
 | `update: allow\|deny`, `delete: allow\|deny` | the same, over every row of the table |
+| `select: todo`, `insert: todo`… | nothing runs; the cell is reported as unspecified |
 
 `defaults` takes the same operations keyed by identity, then table or `"*"` for every table; entries under
 `expect` win over a named table, which wins over `"*"`.
 
-Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
+**Coverage.** Every run ends with `coverage 86/96 cells (89.6%) · 10 unspecified (warn)`: a cell is an
+identity × table × operation with at least one case. `unspecified: warn` (the default) also lists the gaps,
+`ignore` prints only that line, and `fail` makes any gap exit 1, so a table added without a spec breaks CI.
+`rlsspec cover` validates the spec and prints the matrix (`SIUD`, `·` for gaps) without running any case.
+
+**Updates and SELECT policies.** Postgres applies the SELECT policies to an `UPDATE` that reads a column
+(in `where`, or in the `SET c = c` rlsspec runs when a case has no `set`), so a too-wide UPDATE policy can
+hide behind a strict SELECT policy: rows the identity can't see are never updated. For update denies that
+matter, add a case that reads no column, which checks the UPDATE policies alone:
+`{ where: "true", set: { title: "x" }, expect: deny }`.
+
+Commands: `test`, `cover`, `init`, `version`. Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
 `--no-color`.
 
 ## Safety
