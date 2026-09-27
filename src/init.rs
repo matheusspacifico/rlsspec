@@ -8,6 +8,7 @@ use postgres::Transaction;
 use crate::catalog;
 use crate::config::Safety;
 use crate::pg::{self, PgError, Session};
+use crate::preset::Preset;
 
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
@@ -20,6 +21,15 @@ pub enum InitError {
         schemas_phrase(.0)
     )]
     NoRoles(Vec<String>),
+    #[error(
+        "the {} preset needs the roles {}, but the database has no role {}",
+        .preset.name(), .needed.join(" and "), .missing.join(" or ")
+    )]
+    MissingRoles {
+        preset: Preset,
+        needed: Vec<&'static str>,
+        missing: Vec<&'static str>,
+    },
     #[error("{} already exists; pass --force to overwrite it", .0.display())]
     Exists(PathBuf),
     #[error("cannot write {}", path.display())]
@@ -36,14 +46,53 @@ impl From<postgres::Error> for InitError {
     }
 }
 
-/// What `init` found in the database: the tables in scope and the roles to scaffold identities from.
+/// What `init` found in the database: the tables in scope and the identities to scaffold.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scaffold {
     pub schemas: Vec<String>,
     pub tables: Vec<String>,
-    pub identities: Vec<String>,
+    pub preset: Option<Preset>,
+    /// A comment line describing which identities were scaffolded and why.
+    pub rationale: &'static str,
+    pub identities: Vec<Identity>,
     pub left_out: Vec<(String, &'static str)>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identity {
+    pub name: String,
+    pub role: String,
+    /// A YAML flow mapping written as the identity's `claims`.
+    pub claims: Option<String>,
+    pub todo: Option<&'static str>,
+}
+
+/// A role holding a privilege (table or column grant) on a table in scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Grantee {
+    pub role: String,
+    pub superuser: bool,
+    pub bypassrls: bool,
+    pub owner_only: bool,
+}
+
+impl Grantee {
+    /// Why no identity should be scaffolded for this role, if there is a reason.
+    pub fn unfit(&self) -> Option<&'static str> {
+        if self.superuser {
+            Some("superuser, so no policy applies to it")
+        } else if self.bypassrls {
+            Some("BYPASSRLS, so no policy applies to it")
+        } else if self.owner_only {
+            Some("holds privileges only as the owner of the tables")
+        } else {
+            None
+        }
+    }
+}
+
+const GUCS_TODO: &str =
+    "gucs, the session settings your policies read, e.g. gucs: { app.user_id: \"…\" }";
 
 impl Scaffold {
     pub fn cells(&self) -> usize {
@@ -71,11 +120,16 @@ WHERE g.grantee <> 0
 GROUP BY r.rolname, r.rolsuper, r.rolbypassrls
 ORDER BY 1";
 
-/// Reads the tables in `schemas` and the roles holding privileges on them, in a rolled-back transaction.
-pub fn introspect(url: &str, schemas: &[String]) -> Result<Scaffold, InitError> {
+/// Reads the tables in `schemas` and the roles holding privileges on them, in a rolled-back
+/// transaction. With a preset, the preset decides which identities to scaffold.
+pub fn introspect(
+    url: &str,
+    schemas: &[String],
+    preset: Option<Preset>,
+) -> Result<Scaffold, InitError> {
     let mut client = pg::connect(url)?;
     let mut session = Session::begin(&mut client, &Safety::default())?;
-    let scaffold = scaffold(session.tx(), schemas)?;
+    let scaffold = scaffold(session.tx(), schemas, preset)?;
     session.rollback()?;
     if scaffold.tables.is_empty() {
         return Err(InitError::NoTables(schemas.to_vec()));
@@ -86,7 +140,11 @@ pub fn introspect(url: &str, schemas: &[String]) -> Result<Scaffold, InitError> 
     Ok(scaffold)
 }
 
-fn scaffold(tx: &mut Transaction, schemas: &[String]) -> Result<Scaffold, InitError> {
+fn scaffold(
+    tx: &mut Transaction,
+    schemas: &[String],
+    preset: Option<Preset>,
+) -> Result<Scaffold, InitError> {
     let catalog = catalog::load(tx, schemas)?;
     let mut left_out = Vec::new();
     let mut tables = Vec::new();
@@ -102,27 +160,70 @@ fn scaffold(tx: &mut Transaction, schemas: &[String]) -> Result<Scaffold, InitEr
         }
     }
     let oids: Vec<u32> = catalog.tables().iter().map(|t| t.oid).collect();
-    let mut identities = Vec::new();
-    for row in tx.query(ROLES, &[&oids])? {
-        let role: String = row.get(0);
-        let reason = if row.get(1) {
-            "superuser, so no policy applies to it"
-        } else if row.get(2) {
-            "BYPASSRLS, so no policy applies to it"
-        } else if row.get(3) {
-            "holds privileges only as the owner of the tables"
-        } else {
-            identities.push(role);
-            continue;
-        };
-        left_out.push((format!("role {role}"), reason));
-    }
+    let grantees: Vec<Grantee> = tx
+        .query(ROLES, &[&oids])?
+        .iter()
+        .map(|row| Grantee {
+            role: row.get(0),
+            superuser: row.get(1),
+            bypassrls: row.get(2),
+            owner_only: row.get(3),
+        })
+        .collect();
+    let (rationale, identities) = match preset {
+        None => (
+            "One identity per role holding a privilege on a table in scope (PUBLIC excluded).",
+            plain(&grantees, &mut left_out),
+        ),
+        Some(preset) => {
+            let needed = preset.roles();
+            let existing: Vec<String> = tx
+                .query(
+                    "SELECT rolname::text FROM pg_roles WHERE rolname = ANY($1)",
+                    &[&needed],
+                )?
+                .iter()
+                .map(|row| row.get(0))
+                .collect();
+            let missing: Vec<_> = needed
+                .iter()
+                .copied()
+                .filter(|role| !existing.iter().any(|e| e == role))
+                .collect();
+            if !missing.is_empty() {
+                return Err(InitError::MissingRoles {
+                    preset,
+                    needed: needed.to_vec(),
+                    missing,
+                });
+            }
+            preset.scaffold(&grantees, &mut left_out)
+        }
+    };
     Ok(Scaffold {
         schemas: schemas.to_vec(),
         tables,
+        preset,
+        rationale,
         identities,
         left_out,
     })
+}
+
+fn plain(grantees: &[Grantee], left_out: &mut Vec<(String, &'static str)>) -> Vec<Identity> {
+    let mut identities = Vec::new();
+    for grantee in grantees {
+        match grantee.unfit() {
+            Some(reason) => left_out.push((format!("role {}", grantee.role), reason)),
+            None => identities.push(Identity {
+                name: grantee.role.clone(),
+                role: grantee.role.clone(),
+                claims: None,
+                todo: Some(GUCS_TODO),
+            }),
+        }
+    }
+    identities
 }
 
 /// The spec file: valid as is, with every identity × table × operation cell `todo`.
@@ -139,7 +240,7 @@ pub fn render(scaffold: &Scaffold) -> String {
 # `select: deny`, `select: {{ rows: \"published\" }}` or `update: [{{ where: \"true\", expect: deny }}]`.
 # `rlsspec cover` shows what is left; `rlsspec test` runs what is specified.
 version: 1
-
+{preset}
 database:
   url: ${{env:DATABASE_URL}}
   schemas: [{schemas}]
@@ -147,13 +248,13 @@ database:
 # setup:                          # SQL files run first as the privileged role, always rolled back
 #   - seed.sql                    # (the rows your checks need)
 
+# {rationale}
 ",
-        schemas_phrase(&scaffold.schemas)
+        schemas_phrase(&scaffold.schemas),
+        preset = scaffold.preset.map(preset_line).unwrap_or_default(),
+        rationale = scaffold.rationale,
     );
 
-    out.push_str(
-        "# One identity per role holding a privilege on a table in scope (PUBLIC excluded).\n",
-    );
     if !scaffold.left_out.is_empty() {
         out.push_str("# Left out:\n");
         for (what, reason) in &scaffold.left_out {
@@ -161,12 +262,19 @@ database:
         }
     }
     out.push_str("identities:\n");
-    for role in &scaffold.identities {
-        let name = scalar(role);
+    for identity in &scaffold.identities {
         let _ = writeln!(
             out,
-            "  {name}:\n    role: {name}\n    # TODO: gucs, the session settings your policies read, e.g. gucs: {{ app.user_id: \"…\" }}"
+            "  {}:\n    role: {}",
+            scalar(&identity.name),
+            scalar(&identity.role)
         );
+        if let Some(claims) = &identity.claims {
+            let _ = writeln!(out, "    claims: {claims}");
+        }
+        if let Some(todo) = identity.todo {
+            let _ = writeln!(out, "    # TODO: {todo}");
+        }
     }
 
     out.push_str(
@@ -179,11 +287,11 @@ expect:
     );
     for table in &scaffold.tables {
         let _ = writeln!(out, "  {}:", scalar(table));
-        for role in &scaffold.identities {
+        for identity in &scaffold.identities {
             let _ = writeln!(
                 out,
                 "    {}: {{ select: todo, insert: todo, update: todo, delete: todo }}",
-                scalar(role)
+                scalar(&identity.name)
             );
         }
     }
@@ -206,6 +314,14 @@ pub fn write(path: &Path, text: &str, force: bool) -> Result<(), InitError> {
     };
     file.and_then(|mut f| f.write_all(text.as_bytes()))
         .map_err(failed)
+}
+
+fn preset_line(preset: Preset) -> String {
+    format!(
+        "preset: {}                  # {}\n",
+        preset.name(),
+        preset.description()
+    )
 }
 
 fn schemas_phrase(schemas: &[String]) -> String {
@@ -252,10 +368,23 @@ mod tests {
     use crate::config::{self, Spec};
 
     fn example() -> Scaffold {
+        let grantee = |role: &str| Grantee {
+            role: role.into(),
+            superuser: false,
+            bypassrls: false,
+            owner_only: false,
+        };
+        let mut left_out = Vec::new();
+        let identities = plain(
+            &[grantee("app"), grantee("on"), grantee("we\"ird")],
+            &mut left_out,
+        );
         Scaffold {
             schemas: vec!["public".into()],
             tables: vec!["notes".into(), "Weird Table".into()],
-            identities: vec!["app".into(), "on".into(), "we\"ird".into()],
+            preset: None,
+            rationale: "One identity per role.",
+            identities,
             left_out: vec![(
                 "role postgres".into(),
                 "superuser, so no policy applies to it",
@@ -288,5 +417,57 @@ mod tests {
             assert_eq!(ops.update, Some(Spec::Todo));
             assert_eq!(ops.delete, Some(Spec::Todo));
         }
+    }
+
+    #[test]
+    fn supabase_spec_round_trips_with_the_claims_expanded() {
+        let grantee = |role: &str, bypassrls| Grantee {
+            role: role.into(),
+            superuser: false,
+            bypassrls,
+            owner_only: false,
+        };
+        let grantees = [
+            grantee("anon", false),
+            grantee("authenticated", false),
+            grantee("reporting", false),
+            grantee("service_role", true),
+        ];
+        let mut left_out = Vec::new();
+        let (rationale, identities) = Preset::Supabase.scaffold(&grantees, &mut left_out);
+        let names: Vec<_> = left_out.iter().map(|(what, _)| what.as_str()).collect();
+        assert_eq!(names, ["role reporting", "role service_role"]);
+        let text = render(&Scaffold {
+            schemas: vec!["public".into()],
+            tables: vec!["todos".into()],
+            preset: Some(Preset::Supabase),
+            rationale,
+            identities,
+            left_out,
+        });
+        let env = |name: &str| (name == "DATABASE_URL").then(|| "postgres://localhost/db".into());
+        let config = config::parse(&text, Path::new("rlsspec.yaml"), &env).unwrap();
+        let gucs: Vec<_> = config
+            .identities
+            .iter()
+            .map(|i| {
+                (
+                    i.role.as_str(),
+                    i.gucs[0].name.as_str(),
+                    i.gucs[0].value.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            gucs,
+            [
+                ("anon", "request.jwt.claims", r#"{"role":"anon"}"#),
+                (
+                    "authenticated",
+                    "request.jwt.claims",
+                    r#"{"role":"authenticated"}"#
+                ),
+            ]
+        );
     }
 }

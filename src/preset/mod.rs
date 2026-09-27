@@ -4,6 +4,7 @@
 pub mod supabase;
 
 use crate::config::{Config, Diagnostic, Extensions};
+use crate::init::{Grantee, Identity};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Preset {
@@ -20,6 +21,32 @@ impl Preset {
     pub fn name(self) -> &'static str {
         match self {
             Preset::Supabase => "supabase",
+        }
+    }
+
+    /// What the preset does, for the comment next to `preset:` in a scaffolded spec.
+    pub fn description(self) -> &'static str {
+        match self {
+            Preset::Supabase => "identities' `claims` become the JWT settings auth.uid() reads",
+        }
+    }
+
+    /// The roles `init` scaffolds identities for; the database must have them all.
+    pub fn roles(self) -> &'static [&'static str] {
+        match self {
+            Preset::Supabase => &supabase::ROLES,
+        }
+    }
+
+    /// The identities `init` writes, with a comment saying why those, from the roles holding
+    /// privileges on the tables in scope. Roles it leaves out go to `left_out` with the reason.
+    pub fn scaffold(
+        self,
+        grantees: &[Grantee],
+        left_out: &mut Vec<(String, &'static str)>,
+    ) -> (&'static str, Vec<Identity>) {
+        match self {
+            Preset::Supabase => supabase::scaffold(grantees, left_out),
         }
     }
 }

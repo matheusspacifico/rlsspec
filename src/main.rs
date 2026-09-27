@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use rlsspec::config::{self, Config, ConfigError, Source};
 use rlsspec::init::{self, InitError};
 use rlsspec::pg::PgError;
+use rlsspec::preset::Preset;
 use rlsspec::runner::{self, RunError};
 use rlsspec::{report, safety, style};
 
@@ -51,6 +52,9 @@ enum Command {
         /// Overwrite the output file if it exists
         #[arg(long)]
         force: bool,
+        /// Scaffold the identities of a platform preset (supabase) instead of one per role
+        #[arg(long, value_parser = preset)]
+        preset: Option<Preset>,
     },
     /// Print the version
     Version,
@@ -88,7 +92,8 @@ fn run(cli: &Cli) -> Result<ExitCode> {
             ref schemas,
             ref output,
             force,
-        } => init(cli, schemas, output, force),
+            preset,
+        } => init(cli, schemas, output, force, preset),
     }
 }
 
@@ -106,7 +111,13 @@ fn cover(cli: &Cli) -> Result<ExitCode> {
     Ok(ExitCode::from(u8::from(coverage.fails())))
 }
 
-fn init(cli: &Cli, schemas: &[String], output: &Path, force: bool) -> Result<ExitCode> {
+fn init(
+    cli: &Cli,
+    schemas: &[String],
+    output: &Path,
+    force: bool,
+    preset: Option<Preset>,
+) -> Result<ExitCode> {
     if !force && output.exists() {
         return Err(InitError::Exists(output.to_path_buf()).into());
     }
@@ -114,7 +125,7 @@ fn init(cli: &Cli, schemas: &[String], output: &Path, force: bool) -> Result<Exi
         bail!("`DATABASE_URL` is not set; init reads the database to scaffold the spec from it");
     };
     safety::check(&url, &[], cli.allow_remote)?;
-    let scaffold = init::introspect(&url, schemas)?;
+    let scaffold = init::introspect(&url, schemas, preset)?;
     init::write(output, &init::render(&scaffold), force)?;
     println!(
         "wrote {}: {} tables × {} identities, {} cells todo",
@@ -124,6 +135,13 @@ fn init(cli: &Cli, schemas: &[String], output: &Path, force: bool) -> Result<Exi
         scaffold.cells()
     );
     Ok(ExitCode::SUCCESS)
+}
+
+fn preset(name: &str) -> Result<Preset, String> {
+    Preset::from_name(name).ok_or_else(|| {
+        let known: Vec<_> = Preset::ALL.iter().map(|p| p.name()).collect();
+        format!("expected one of: {}", known.join(", "))
+    })
 }
 
 fn load(cli: &Cli) -> Result<(Config, Source)> {

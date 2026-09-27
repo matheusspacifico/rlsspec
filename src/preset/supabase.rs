@@ -4,6 +4,10 @@
 use serde_json::Value;
 
 use crate::config::{Claims, Config, Diagnostic, Guc};
+use crate::init::{Grantee, Identity};
+
+/// The roles PostgREST switches to: `anon` for requests without a JWT, `authenticated` with one.
+pub const ROLES: [&str; 2] = ["anon", "authenticated"];
 
 const CLAIMS_GUC: &str = "request.jwt.claims";
 const CLAIM_GUC_PREFIX: &str = "request.jwt.claim.";
@@ -62,6 +66,40 @@ pub fn expand(mut config: Config, claims: Vec<Claims>) -> Result<Config, Vec<Dia
         diagnostics.sort_by_key(|d| d.span);
         Err(diagnostics)
     }
+}
+
+pub fn scaffold(
+    grantees: &[Grantee],
+    left_out: &mut Vec<(String, &'static str)>,
+) -> (&'static str, Vec<Identity>) {
+    for grantee in grantees {
+        if ROLES.contains(&grantee.role.as_str()) {
+            continue;
+        }
+        let reason = grantee.unfit().unwrap_or(
+            "not a role the Supabase API switches to; add an identity by hand if it needs one",
+        );
+        left_out.push((format!("role {}", grantee.role), reason));
+    }
+    let identity = |role: &str, todo| Identity {
+        name: role.to_owned(),
+        role: role.to_owned(),
+        claims: Some(format!("{{ role: {role} }}")),
+        todo,
+    };
+    let identities = vec![
+        identity("anon", None),
+        identity(
+            "authenticated",
+            Some(
+                "sub, the user id auth.uid() returns, e.g. claims: { sub: \"…\" }; one identity per user you check",
+            ),
+        ),
+    ];
+    (
+        "The roles the Supabase API switches to: anon without a JWT, authenticated with one.",
+        identities,
+    )
 }
 
 #[cfg(test)]
