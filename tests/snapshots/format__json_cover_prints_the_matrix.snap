@@ -1,0 +1,71 @@
+---
+source: tests/format.rs
+expression: out
+---
+{
+  "schema_version": 1,
+  "command": "cover",
+  "identities": [
+    "alice",
+    "guest"
+  ],
+  "tables": [
+    {
+      "table": "notes",
+      "cells": [
+        {
+          "identity": "alice",
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        },
+        {
+          "identity": "guest",
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        }
+      ]
+    },
+    {
+      "table": "tags",
+      "cells": [
+        {
+          "identity": "alice",
+          "select": false,
+          "insert": false,
+          "update": false,
+          "delete": false
+        },
+        {
+          "identity": "guest",
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": true
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "policy": "fail",
+    "total": 16,
+    "specified": 12,
+    "unspecified": 4,
+    "gaps": [
+      {
+        "table": "tags",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ]
+      }
+    ]
+  },
+  "exit_code": 1
+}

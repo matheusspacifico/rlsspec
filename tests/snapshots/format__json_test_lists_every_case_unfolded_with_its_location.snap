@@ -1,0 +1,243 @@
+---
+source: tests/format.rs
+expression: out
+---
+{
+  "schema_version": 1,
+  "command": "test",
+  "cases": [
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "select",
+      "origin": "expect",
+      "description": "all",
+      "outcome": "pass",
+      "detail": "6 visible",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 21,
+        "column": 15
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "insert",
+      "origin": "expect",
+      "description": "values (id = 7, tenant_id = '00000000-0000-4000-8000-00000000000a', author_id = '00000000-0000-4000-8000-0000000a11ce', body = 'x') → allow",
+      "outcome": "fail",
+      "detail": "denied: new row violates row-level security policy for table \"notes\" (SQLSTATE 42501)",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 23,
+        "column": 11
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "update",
+      "origin": "expect",
+      "description": "where tenant_id = '00000000-0000-4000-8000-00000000000a' → allow",
+      "outcome": "pass",
+      "detail": "affected 3 of 3 rows",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 25,
+        "column": 11
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "update",
+      "origin": "expect",
+      "description": "where tenant_id = '00000000-0000-4000-8000-00000000000b' → deny",
+      "outcome": "fail",
+      "detail": "affected 3 of 3 rows (expected 0)",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 26,
+        "column": 11
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "update",
+      "origin": "expect",
+      "description": "where id > 100 → deny",
+      "outcome": "inconclusive",
+      "detail": "vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/format/mixed.yaml:27:11)",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 27,
+        "column": 11
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "expect",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "affected 0 of 6 rows",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 28,
+        "column": 15
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "select",
+      "origin": "expect",
+      "description": "rows: tenant_id = '00000000-0000-4000-8000-00000000000a'",
+      "outcome": "pass",
+      "detail": "1 visible",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 31,
+        "column": 15
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 20
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 48
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 62
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 34
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 48
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/format/mixed.yaml",
+        "line": 17,
+        "column": 62
+      }
+    }
+  ],
+  "coverage": {
+    "policy": "fail",
+    "total": 16,
+    "specified": 13,
+    "unspecified": 3,
+    "gaps": [
+      {
+        "table": "tags",
+        "identity": "alice",
+        "ops": [
+          "insert",
+          "update",
+          "delete"
+        ]
+      }
+    ]
+  },
+  "totals": {
+    "passed": 12,
+    "failed": 2,
+    "inconclusive": 1
+  },
+  "exit_code": 2
+}

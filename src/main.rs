@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use rlsspec::config::{self, Config, ConfigError, Source};
 use rlsspec::init::{self, InitError};
 use rlsspec::lint;
@@ -39,11 +39,20 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Run every case in the spec against the database
-    Test,
+    Test {
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Print which identity × table × operation cells have a case, without running any
-    Cover,
+    Cover {
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Check the catalog for common RLS mistakes (rules RLS001–RLS008), without running any case
-    Lint,
+    Lint {
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
     /// Write a spec from the database (DATABASE_URL) with every identity × table × operation `todo`
     Init {
         /// Schemas whose tables are in scope
@@ -61,6 +70,15 @@ enum Command {
     },
     /// Print the version
     Version,
+}
+
+/// How a report is written to stdout. Errors are text on stderr whatever the format.
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Format {
+    /// Human-readable, coloured on a terminal
+    Text,
+    /// One JSON document (schema_version 1)
+    Json,
 }
 
 fn main() -> ExitCode {
@@ -89,9 +107,9 @@ fn run(cli: &Cli) -> Result<ExitCode> {
             println!("rlsspec {}", env!("CARGO_PKG_VERSION"));
             Ok(ExitCode::SUCCESS)
         }
-        Command::Test => test(cli),
-        Command::Cover => cover(cli),
-        Command::Lint => lint(cli),
+        Command::Test { format } => test(cli, format),
+        Command::Cover { format } => cover(cli, format),
+        Command::Lint { format } => lint(cli, format),
         Command::Init {
             ref schemas,
             ref output,
@@ -101,24 +119,33 @@ fn run(cli: &Cli) -> Result<ExitCode> {
     }
 }
 
-fn test(cli: &Cli) -> Result<ExitCode> {
+fn test(cli: &Cli, format: Format) -> Result<ExitCode> {
     let (config, source) = load(cli)?;
     let report = runner::run(&config, &source)?;
-    anstream::print!("{}", report::text::render(&report));
+    match format {
+        Format::Text => anstream::print!("{}", report::text::render(&report)),
+        Format::Json => print!("{}", report::json::render(&report)?),
+    }
     Ok(ExitCode::from(report.exit_code()))
 }
 
-fn cover(cli: &Cli) -> Result<ExitCode> {
+fn cover(cli: &Cli, format: Format) -> Result<ExitCode> {
     let (config, source) = load(cli)?;
     let coverage = runner::cover(&config, &source)?;
-    anstream::print!("{}", report::text::render_cover(&coverage));
+    match format {
+        Format::Text => anstream::print!("{}", report::text::render_cover(&coverage)),
+        Format::Json => print!("{}", report::json::render_cover(&coverage)?),
+    }
     Ok(ExitCode::from(u8::from(coverage.fails())))
 }
 
-fn lint(cli: &Cli) -> Result<ExitCode> {
+fn lint(cli: &Cli, format: Format) -> Result<ExitCode> {
     let (config, source) = load(cli)?;
     let report = lint::run(&config, &source)?;
-    anstream::print!("{}", report::text::render_lint(&report));
+    match format {
+        Format::Text => anstream::print!("{}", report::text::render_lint(&report)),
+        Format::Json => print!("{}", report::json::render_lint(&report)?),
+    }
     Ok(ExitCode::from(report.exit_code()))
 }
 

@@ -385,6 +385,7 @@ mod tests {
             description: "deny".into(),
             outcome,
             origin: Origin::Expect,
+            span: crate::config::Span::default(),
         };
         Report {
             results: vec![
@@ -486,8 +487,10 @@ coverage 10/16 cells (62.5%) · 6 unspecified (fail)
             function: None,
             view: None,
             identities: Vec::new(),
+            stale_ignore: None,
         };
         let report = LintReport {
+            spec: "rlsspec.yaml".into(),
             findings: vec![
                 finding(Rule::Rls001, "tags", None, "no RLS"),
                 finding(Rule::Rls004, "notes", Some("app"), "USING (true)"),

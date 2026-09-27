@@ -132,3 +132,20 @@ fn init_needs_database_url() {
             .starts_with("error: `DATABASE_URL` is not set")
     );
 }
+
+#[test]
+fn errors_stay_text_on_stderr_whatever_the_format() {
+    for command in ["test", "cover", "lint"] {
+        let text = rlsspec(&[command, "-c", "tests/fixtures/cli/invalid.yaml"]);
+        let json = rlsspec(&[
+            command,
+            "-c",
+            "tests/fixtures/cli/invalid.yaml",
+            "--format",
+            "json",
+        ]);
+        assert_eq!(json.code, Some(2), "{command}");
+        assert_eq!(json.stdout, "", "{command}");
+        assert_eq!(json.stderr, text.stderr, "{command}");
+    }
+}

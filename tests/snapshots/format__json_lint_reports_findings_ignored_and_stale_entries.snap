@@ -1,0 +1,81 @@
+---
+source: tests/format.rs
+expression: "out.replace(SKIPPED_RLS007, SKIPPED_NONE)"
+---
+{
+  "schema_version": 1,
+  "command": "lint",
+  "findings": [
+    {
+      "rule": "RLS001",
+      "severity": "error",
+      "object": "tags",
+      "role": null,
+      "hint": "row level security is not enabled: every role with a grant sees every row",
+      "table": {
+        "schema": "public",
+        "name": "tags"
+      },
+      "function": null,
+      "view": null,
+      "identities": [],
+      "stale_ignore": null
+    },
+    {
+      "rule": "RLS004",
+      "severity": "warn",
+      "object": "notes",
+      "role": "app",
+      "hint": "permissive UPDATE policy `anyone_edits` has USING (true): it allows every row",
+      "table": {
+        "schema": "public",
+        "name": "notes"
+      },
+      "function": null,
+      "view": null,
+      "identities": [
+        "alice"
+      ],
+      "stale_ignore": null
+    },
+    {
+      "rule": "RLS006",
+      "severity": "info",
+      "object": "audit_log",
+      "role": null,
+      "hint": "RLS is enabled with no policy: every row is denied (a forgotten migration?)",
+      "table": {
+        "schema": "public",
+        "name": "audit_log"
+      },
+      "function": null,
+      "view": null,
+      "identities": [],
+      "stale_ignore": null
+    },
+    {
+      "rule": "RLS006",
+      "severity": "warn",
+      "object": "tests/fixtures/format/lint.yaml:9",
+      "role": null,
+      "hint": "stale ignore: no RLS006 finding matches it; remove it",
+      "table": null,
+      "function": null,
+      "view": null,
+      "identities": [],
+      "stale_ignore": {
+        "file": "tests/fixtures/format/lint.yaml",
+        "line": 9,
+        "column": 7
+      }
+    }
+  ],
+  "ignored": 1,
+  "skipped": [],
+  "totals": {
+    "error": 1,
+    "warn": 2,
+    "info": 1
+  },
+  "exit_code": 1
+}

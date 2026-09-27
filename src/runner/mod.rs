@@ -4,7 +4,7 @@ pub(crate) mod plan;
 mod select;
 mod write;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::catalog::{self, Catalog, Table};
 use crate::config::{
@@ -76,10 +76,14 @@ pub struct CaseResult {
     pub description: String,
     pub outcome: Outcome,
     pub origin: Origin,
+    /// Where the case is written in the spec: the `expect` entry, or the `defaults` one it came from.
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Report {
+    /// The spec file the run loaded.
+    pub spec: PathBuf,
     pub results: Vec<CaseResult>,
     pub coverage: Coverage,
 }
@@ -137,6 +141,7 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
         Preflight::Apply,
         |session, catalog, plan| {
             let mut report = Report {
+                spec: source.path.clone(),
                 results: Vec::new(),
                 coverage: coverage::compute(config, catalog, plan),
             };
@@ -216,7 +221,7 @@ impl Cell<'_> {
         &self,
         report: &mut Report,
         op: Op,
-        origin: Origin,
+        (origin, span): (Origin, Span),
         description: String,
         outcome: Outcome,
     ) {
@@ -227,6 +232,7 @@ impl Cell<'_> {
             description,
             outcome,
             origin,
+            span,
         });
     }
 
@@ -239,18 +245,18 @@ impl Cell<'_> {
             self.push(
                 report,
                 Op::Select,
-                origin,
+                (origin, case.span),
                 select::describe(&case.select),
                 outcome,
             );
         }
         match self.entry.insert {
             // `insert: allow` is rejected when the config is loaded.
-            Some((Spec::Given(Writes::Shorthand { expect, .. }), origin)) => {
+            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
                 let outcome =
                     session.case(|tx| insert_deny::check(tx, table, &self.name, identity))??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Insert, origin, description, outcome);
+                self.push(report, Op::Insert, (origin, *span), description, outcome);
             }
             Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
@@ -260,7 +266,7 @@ impl Cell<'_> {
                     self.push(
                         report,
                         Op::Insert,
-                        origin,
+                        (origin, case.span),
                         write::describe_insert(case),
                         outcome,
                     );
@@ -275,7 +281,7 @@ impl Cell<'_> {
                     write::modify(tx, table, identity, Modify::Update(None), None, *expect, at)
                 })??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Update, origin, description, outcome);
+                self.push(report, Op::Update, (origin, *span), description, outcome);
             }
             Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
@@ -294,7 +300,13 @@ impl Cell<'_> {
                         )
                     })??;
                     let description = write::describe_modify(&case.predicate, set, case.expect);
-                    self.push(report, Op::Update, origin, description, outcome);
+                    self.push(
+                        report,
+                        Op::Update,
+                        (origin, case.span),
+                        description,
+                        outcome,
+                    );
                 }
             }
             Some((Spec::Todo, _)) | None => {}
@@ -306,7 +318,7 @@ impl Cell<'_> {
                     write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
                 })??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Delete, origin, description, outcome);
+                self.push(report, Op::Delete, (origin, *span), description, outcome);
             }
             Some((Spec::Given(Writes::Cases(cases)), origin)) => {
                 for case in cases {
@@ -324,7 +336,13 @@ impl Cell<'_> {
                         )
                     })??;
                     let description = write::describe_modify(&case.predicate, None, case.expect);
-                    self.push(report, Op::Delete, origin, description, outcome);
+                    self.push(
+                        report,
+                        Op::Delete,
+                        (origin, case.span),
+                        description,
+                        outcome,
+                    );
                 }
             }
             Some((Spec::Todo, _)) | None => {}

@@ -1,0 +1,9 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../lint/notes.sql, ../lint/secured.sql, lint.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+lint:
+  ignore:
+    - { rule: RLS004, table: comments, reason: "comments are moderated by any member" }
+    - { rule: RLS006, table: notes, reason: "notes has policies: this entry is stale" }

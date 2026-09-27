@@ -1,0 +1,31 @@
+# One run with every outcome: alice's update of the other tenant fails (USING (true)), her insert fails
+# (no INSERT policy), an update matching no row is inconclusive, and guest's cases come from defaults.
+# tags has gaps under `unspecified: fail`.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql, ../writes/update_using_true.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+  alice: 00000000-0000-4000-8000-0000000a11ce
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice}" } }
+  guest: { role: web_anon }
+unspecified: fail
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }
+expect:
+  notes:
+    alice:
+      select: all
+      insert:
+        - { values: { id: 7, tenant_id: "${tenant_a}", author_id: "${alice}", body: "x" }, expect: allow }
+      update:
+        - { where: "tenant_id = ${tenant_a}", expect: allow }
+        - { where: "tenant_id = ${tenant_b}", expect: deny }
+        - { where: "id > 100", expect: deny }
+      delete: deny
+  tags:
+    alice:
+      select: { rows: "tenant_id = ${tenant_a}" }

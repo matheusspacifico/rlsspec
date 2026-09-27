@@ -8,11 +8,11 @@ mod rls007;
 mod rls008;
 mod rule;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::catalog::lint::{self as facts, LintCatalog, RlsTable, RoleFacts};
 use crate::catalog::{Catalog, Table};
-use crate::config::{Config, Ignore, Source};
+use crate::config::{Config, Ignore, Source, Span};
 use crate::runner::plan::Entry;
 use crate::runner::{self, RunError};
 
@@ -59,6 +59,8 @@ pub struct Finding {
     pub view: Option<Name>,
     /// The identities concerned, which `lint.ignore` entries match on.
     pub identities: Vec<String>,
+    /// For a stale ignore, where its `lint.ignore` entry is written.
+    pub stale_ignore: Option<Span>,
 }
 
 impl Finding {
@@ -73,6 +75,7 @@ impl Finding {
             function: None,
             view: None,
             identities: Vec::new(),
+            stale_ignore: None,
         }
     }
 }
@@ -85,6 +88,8 @@ pub struct Skipped {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LintReport {
+    /// The spec file the run loaded.
+    pub spec: PathBuf,
     /// Grouped by rule; ignored findings are left out, stale ignores are warnings of their rule.
     pub findings: Vec<Finding>,
     pub ignored: usize,
@@ -136,6 +141,7 @@ fn check(cx: &Context, ignore: &[Ignore], path: &Path) -> LintReport {
 
     let mut used = vec![false; ignore.len()];
     let mut report = LintReport {
+        spec: path.to_path_buf(),
         skipped,
         ..LintReport::default()
     };
@@ -166,6 +172,7 @@ fn check(cx: &Context, ignore: &[Ignore], path: &Path) -> LintReport {
             ),
         );
         stale.severity = Severity::Warn;
+        stale.stale_ignore = Some(entry.span);
         report.findings.push(stale);
     }
     report.findings.sort_by_key(|f| f.rule);

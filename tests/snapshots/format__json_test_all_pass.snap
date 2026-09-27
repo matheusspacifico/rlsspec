@@ -1,0 +1,247 @@
+---
+source: tests/format.rs
+expression: out
+---
+{
+  "schema_version": 1,
+  "command": "test",
+  "cases": [
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "select",
+      "origin": "expect",
+      "description": "all",
+      "outcome": "pass",
+      "detail": "6 visible",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 15,
+        "column": 22
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no policy)",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 20
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "affected 0 of 6 rows",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "affected 0 of 6 rows",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 48
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "select",
+      "origin": "expect",
+      "description": "rows: tenant_id = '00000000-0000-4000-8000-00000000000a'",
+      "outcome": "pass",
+      "detail": "1 visible",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 17,
+        "column": 22
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 34
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 12,
+        "column": 48
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 20
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 48
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 62
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 34
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 48
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/coverage/fail_covered.yaml",
+        "line": 10,
+        "column": 62
+      }
+    }
+  ],
+  "coverage": {
+    "policy": "fail",
+    "total": 16,
+    "specified": 16,
+    "unspecified": 0,
+    "gaps": []
+  },
+  "totals": {
+    "passed": 16,
+    "failed": 0,
+    "inconclusive": 0
+  },
+  "exit_code": 0
+}
