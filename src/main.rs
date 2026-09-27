@@ -6,6 +6,7 @@ use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use rlsspec::config::{self, Config, ConfigError, Source};
 use rlsspec::init::{self, InitError};
+use rlsspec::lint;
 use rlsspec::pg::PgError;
 use rlsspec::preset::Preset;
 use rlsspec::runner::{self, RunError};
@@ -41,6 +42,8 @@ enum Command {
     Test,
     /// Print which identity × table × operation cells have a case, without running any
     Cover,
+    /// Check the catalog for common RLS mistakes (rules RLS001–RLS008), without running any case
+    Lint,
     /// Write a spec from the database (DATABASE_URL) with every identity × table × operation `todo`
     Init {
         /// Schemas whose tables are in scope
@@ -88,6 +91,7 @@ fn run(cli: &Cli) -> Result<ExitCode> {
         }
         Command::Test => test(cli),
         Command::Cover => cover(cli),
+        Command::Lint => lint(cli),
         Command::Init {
             ref schemas,
             ref output,
@@ -109,6 +113,13 @@ fn cover(cli: &Cli) -> Result<ExitCode> {
     let coverage = runner::cover(&config, &source)?;
     anstream::print!("{}", report::text::render_cover(&coverage));
     Ok(ExitCode::from(u8::from(coverage.fails())))
+}
+
+fn lint(cli: &Cli) -> Result<ExitCode> {
+    let (config, source) = load(cli)?;
+    let report = lint::run(&config, &source)?;
+    anstream::print!("{}", report::text::render_lint(&report));
+    Ok(ExitCode::from(report.exit_code()))
 }
 
 fn init(

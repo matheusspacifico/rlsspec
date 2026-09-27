@@ -1,0 +1,12 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [notes.sql, secured.sql, ignore.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+  bob: { role: app }
+lint:
+  ignore:
+    - { rule: RLS001, table: tags, reason: "a lookup table, the same for every tenant" }
+    - { rule: RLS004, table: comments, reason: "comments are moderated by any member" }
+    - { rule: RLS004, table: public.comments, identity: bob, reason: "same finding, qualified and by identity" }
+    - { rule: RLS006, table: notes, reason: "notes has policies: this entry is stale" }

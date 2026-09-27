@@ -96,7 +96,7 @@ impl Db {
         self.rlsspec_with_url(args, &self.url("postgres", "postgres"))
     }
 
-    fn rlsspec_with_url(&self, args: &[&str], database_url: &str) -> Output {
+    pub fn rlsspec_with_url(&self, args: &[&str], database_url: &str) -> Output {
         let output = Command::new(env!("CARGO_BIN_EXE_rlsspec"))
             .args(args)
             .env("DATABASE_URL", database_url)
@@ -120,6 +120,23 @@ impl Db {
     pub fn count(&self, table: &str) -> i64 {
         connect(&self.url("postgres", "postgres"))
             .query_one(&format!("SELECT count(*) FROM {table}"), &[])
+            .unwrap()
+            .get(0)
+    }
+
+    pub fn server_version(&self) -> i32 {
+        connect(&self.url("postgres", "postgres"))
+            .query_one("SELECT current_setting('server_version_num')::int", &[])
+            .unwrap()
+            .get(0)
+    }
+
+    pub fn role_exists(&self, role: &str) -> bool {
+        connect(&self.url("postgres", "postgres"))
+            .query_one(
+                "SELECT exists (SELECT FROM pg_roles WHERE rolname = $1)",
+                &[&role],
+            )
             .unwrap()
             .get(0)
     }

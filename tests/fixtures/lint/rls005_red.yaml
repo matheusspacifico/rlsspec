@@ -1,0 +1,6 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [notes.sql, secured.sql, rls005_red.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+

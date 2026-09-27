@@ -1,0 +1,10 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [notes.sql, secured.sql, ignore.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+  bob: { role: app }
+lint:
+  ignore:
+    - { rule: RLS001, reason: "every table without RLS is a lookup table here" }
+    - { rule: RLS004, identity: bob, reason: "no table: every RLS004 finding for bob's role" }

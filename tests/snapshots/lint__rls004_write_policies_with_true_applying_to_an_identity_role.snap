@@ -1,0 +1,7 @@
+---
+source: tests/lint.rs
+expression: out
+---
+! RLS004  notes  app  permissive DELETE policy `anyone_deletes` has USING (true): it allows every row
+! RLS004  notes  app  permissive UPDATE policy `anyone_edits` has USING (true): it allows every row
+0 errors · 2 warnings · 0 info · 0 ignored

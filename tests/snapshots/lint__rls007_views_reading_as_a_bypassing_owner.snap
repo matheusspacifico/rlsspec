@@ -1,0 +1,8 @@
+---
+source: tests/lint.rs
+expression: out
+---
+! RLS007  public.note_counts     app  materialized view: its rows are stored without RLS, every reader sees all of them
+! RLS007  public.notes_all       app  reads as its owner postgres, who bypasses RLS: set security_invoker = true
+! RLS007  public.notes_by_owner  app  reads as its owner owner_login, who owns notes: set security_invoker = true
+0 errors · 3 warnings · 0 info · 0 ignored

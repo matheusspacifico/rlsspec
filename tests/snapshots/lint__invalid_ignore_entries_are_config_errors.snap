@@ -1,0 +1,23 @@
+---
+source: tests/lint.rs
+expression: out.stderr
+---
+error: ignore entry needs a `reason` saying why the finding is acceptable
+ --> tests/fixtures/lint/ignore_invalid.yaml:7:7
+  |
+7 |     - { rule: RLS002, table: notes }
+  |       ^
+
+error: unknown rule `RLS010`; expected RLS001 to RLS008
+ --> tests/fixtures/lint/ignore_invalid.yaml:8:15
+  |
+8 |     - { rule: RLS010, reason: "no such rule" }
+  |               ^
+
+error: RLS006 findings have no `identity`; match them on `table`
+ --> tests/fixtures/lint/ignore_invalid.yaml:9:33
+  |
+9 |     - { rule: RLS006, identity: alice, reason: "RLS006 is about tables only" }
+  |                                 ^
+
+error: could not load tests/fixtures/lint/ignore_invalid.yaml (3 errors)

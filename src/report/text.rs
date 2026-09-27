@@ -3,6 +3,7 @@ use std::fmt::Write;
 use anstyle::Style;
 
 use crate::config::Unspecified;
+use crate::lint::{LintReport, Severity};
 use crate::runner::coverage::Coverage;
 use crate::runner::{CaseResult, Op, Origin, Outcome, Report};
 use crate::style;
@@ -283,6 +284,62 @@ pub fn coverage_line(coverage: &Coverage) -> String {
     )
 }
 
+/// One line per finding, grouped by rule, then the rules skipped and the totals.
+pub fn render_lint(report: &LintReport) -> String {
+    let width = |cell: fn(&crate::lint::Finding) -> usize| {
+        report.findings.iter().map(cell).max().unwrap_or(0)
+    };
+    let object_width = width(|f| f.object.chars().count());
+    let role_width = width(|f| f.role.as_ref().map_or(0, |r| r.chars().count()));
+    let muted = style::MUTED;
+    let mut out = String::new();
+    for finding in &report.findings {
+        let (s, mark) = severity_mark(finding.severity);
+        let _ = write!(
+            out,
+            "{s}{mark}{s:#} {}  {:<object_width$}",
+            finding.rule, finding.object
+        );
+        if role_width > 0 {
+            let role = finding.role.as_deref().unwrap_or("");
+            let _ = write!(out, "  {muted}{role:<role_width$}{muted:#}");
+        }
+        let _ = writeln!(out, "  {}", finding.hint);
+    }
+    for skipped in &report.skipped {
+        let _ = writeln!(
+            out,
+            "{muted}{} skipped: {}{muted:#}",
+            skipped.rule, skipped.reason
+        );
+    }
+
+    let count = |n: usize, one: &str, many: &str, when_nonzero: Style| {
+        let s = if n > 0 { when_nonzero } else { Style::new() };
+        let label = if n == 1 { one } else { many };
+        format!("{s}{n} {label}{s:#}")
+    };
+    let errors = report.count(Severity::Error);
+    let warnings = report.count(Severity::Warn);
+    let _ = writeln!(
+        out,
+        "{} · {} · {} · {}",
+        count(errors, "error", "errors", style::FAIL),
+        count(warnings, "warning", "warnings", style::INCONCLUSIVE),
+        count(report.count(Severity::Info), "info", "info", Style::new()),
+        count(report.ignored, "ignored", "ignored", style::MUTED),
+    );
+    out
+}
+
+fn severity_mark(severity: Severity) -> (Style, &'static str) {
+    match severity {
+        Severity::Error => (style::FAIL, "✗"),
+        Severity::Warn => (style::INCONCLUSIVE, "!"),
+        Severity::Info => (style::MUTED, "i"),
+    }
+}
+
 /// Shortens long quoted literals (typically UUIDs) to their last characters: `'…000a'`.
 fn shorten_literals(sql: &str) -> String {
     let mut out = String::with_capacity(sql.len());
@@ -412,6 +469,46 @@ coverage 10/16 cells (62.5%) · 6 unspecified (fail)
         assert_eq!(
             plain(&coverage_line(&coverage)),
             "coverage 999/1000 cells (99.9%) · 1 unspecified (fail)\n"
+        );
+    }
+
+    #[test]
+    fn lint_report_aligns_findings_and_counts_by_severity() {
+        use crate::lint::{Finding, Rule, Skipped};
+
+        let finding = |rule: Rule, object: &str, role: Option<&str>, hint: &str| Finding {
+            rule,
+            severity: rule.severity(),
+            object: object.into(),
+            role: role.map(str::to_owned),
+            hint: hint.into(),
+            table: None,
+            function: None,
+            view: None,
+            identities: Vec::new(),
+        };
+        let report = LintReport {
+            findings: vec![
+                finding(Rule::Rls001, "tags", None, "no RLS"),
+                finding(Rule::Rls004, "notes", Some("app"), "USING (true)"),
+                finding(Rule::Rls006, "audit_log", None, "no policy"),
+            ],
+            ignored: 2,
+            skipped: vec![Skipped {
+                rule: Rule::Rls007,
+                reason: "needs PostgreSQL 15",
+            }],
+        };
+        let styled = render_lint(&report);
+        assert!(styled.contains('\x1b'), "{styled:?}");
+        assert_eq!(
+            plain(&styled),
+            "✗ RLS001  tags            no RLS
+! RLS004  notes      app  USING (true)
+i RLS006  audit_log       no policy
+RLS007 skipped: needs PostgreSQL 15
+1 error · 1 warning · 1 info · 2 ignored
+"
         );
     }
 

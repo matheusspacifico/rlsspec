@@ -1,0 +1,7 @@
+---
+source: tests/lint.rs
+expression: out
+---
+! RLS004  notes                               app  permissive UPDATE policy `anyone_edits` has USING (true): it allows every row
+! RLS006  tests/fixtures/lint/ignore.yaml:12       stale ignore: no RLS006 finding matches it; remove it
+0 errors · 2 warnings · 0 info · 2 ignored

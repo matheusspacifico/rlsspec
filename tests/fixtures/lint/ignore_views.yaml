@@ -1,0 +1,10 @@
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [notes.sql, secured.sql, rls007_red.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+lint:
+  ignore:
+    - { rule: RLS007, view: note_counts, reason: "tenant counts are public" }
+    - { rule: RLS007, view: public.notes_all, identity: alice, reason: "an admin report" }
+    - { rule: RLS007, view: notes_by_owner, reason: "same" }
