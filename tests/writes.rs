@@ -115,3 +115,13 @@ fn two_blocks_for_the_same_table_and_identity_are_located() {
 fn only_a_constant_update_over_every_row_sees_past_the_select_policies() {
     insta::assert_snapshot!(report("update_hidden_by_select", 1));
 }
+
+#[test]
+fn audit_trigger_behind_a_correct_policy_passes() {
+    insta::assert_snapshot!(report("audited_pass", 0));
+}
+
+#[test]
+fn a_denied_audit_trigger_is_not_the_policy_denying_the_write() {
+    insta::assert_snapshot!(report("audited_broken", 2));
+}

@@ -113,17 +113,13 @@ pub fn insert(
         (Ok(_), Expectation::Deny) => {
             Outcome::Fail("inserted (expected a permission error)".into())
         }
-        (Err(err), Expectation::Deny) if pg::is_denied(&err) => {
+        (Err(err), Expectation::Deny) if denied_on(&err, table) => {
             Outcome::Pass("permission denied".into())
         }
-        (Err(err), Expectation::Allow) if pg::is_denied(&err) => {
+        (Err(err), Expectation::Allow) if denied_on(&err, table) => {
             Outcome::Fail(format!("denied: {}", pg::describe(&err)))
         }
-        (Err(err), _) => Outcome::Inconclusive(format!(
-            "insert as `{}` failed: {} ({at})",
-            identity.name,
-            pg::describe(&err)
-        )),
+        (Err(err), _) => failed("insert", identity, table, &err, at),
     };
     Ok(outcome)
 }
@@ -219,19 +215,40 @@ pub fn modify(
         (Ok(n), Expectation::Deny) => {
             Outcome::Fail(format!("affected {n} of {expected} rows (expected 0)"))
         }
-        (Err(err), Expectation::Deny) if pg::is_denied(&err) => {
+        (Err(err), Expectation::Deny) if denied_on(&err, table) => {
             Outcome::Pass("permission denied".into())
         }
         // A WITH CHECK violation on an allow case is a real finding, not an inconclusive run.
-        (Err(err), Expectation::Allow) if pg::is_denied(&err) => Outcome::Fail(format!(
+        (Err(err), Expectation::Allow) if denied_on(&err, table) => Outcome::Fail(format!(
             "denied: {} (expected {expected} of {expected} rows)",
             pg::describe(&err)
         )),
-        (Err(err), _) => Outcome::Inconclusive(format!(
-            "{verb} as `{}` failed: {} ({at})",
-            identity.name,
-            pg::describe(&err)
-        )),
+        (Err(err), _) => failed(verb, identity, table, &err, at),
     };
     Ok(outcome)
+}
+
+fn denied_on(err: &postgres::Error, table: &Table) -> bool {
+    pg::is_denied_on(err, &table.schema, &table.name)
+}
+
+/// Any error but a deny on the target. A `42501` from a trigger, a function or another object says the
+/// row was rejected, but not by what the spec is about (§4.3).
+fn failed(
+    verb: &str,
+    identity: &Identity,
+    table: &Table,
+    err: &postgres::Error,
+    at: Location,
+) -> Outcome {
+    let who = &identity.name;
+    Outcome::Inconclusive(if pg::is_denied(err) {
+        format!(
+            "{verb} as `{who}` was denied, but not on `{}`: {} ({at})",
+            table.name,
+            pg::describe_with_context(err)
+        )
+    } else {
+        format!("{verb} as `{who}` failed: {} ({at})", pg::describe(err))
+    })
 }

@@ -1,0 +1,19 @@
+---
+source: tests/writes.rs
+expression: "report(\"audited_pass\", 0)"
+---
+notes
+  ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce', body = 'mine') → allow   inserted
+  ✓ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = 'theirs') → deny  permission denied
+  ✓ alice  update  where tenant_id = '…000a' → allow                                                  affected 3 of 3 rows
+  ✓ alice  update  where tenant_id = '…000b' → deny                                                   affected 0 of 3 rows
+  ✓ alice  delete  where id = 1 → allow                                                               affected 1 of 1 rows
+  ✓ alice  delete  where tenant_id = '…000b' → deny                                                   affected 0 of 3 rows
+coverage 3/12 cells (25.0%) · 9 unspecified (warn)
+notes
+  ○ alice  select
+tags
+  ○ alice  select, insert, update, delete
+note_events
+  ○ alice  select, insert, update, delete
+0 failed · 6 passed · 0 inconclusive

@@ -1,0 +1,19 @@
+---
+source: tests/writes.rs
+expression: "report(\"audited_broken\", 2)"
+---
+notes
+  ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce', body = 'mine') → allow   inserted
+  ? alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = 'theirs') → deny  insert as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 6 at SQL statement (tests/fixtures/writes/audited_broken.yaml:15:11)
+  ✓ alice  update  where tenant_id = '…000a' → allow                                                  affected 3 of 3 rows
+  ? alice  update  where tenant_id = '…000b' → deny                                                   update as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 6 at SQL statement (tests/fixtures/writes/audited_broken.yaml:18:11)
+  ✓ alice  delete  where id = 1 → allow                                                               affected 1 of 1 rows
+  ? alice  delete  where tenant_id = '…000b' → deny                                                   delete as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 4 at SQL statement (tests/fixtures/writes/audited_broken.yaml:21:11)
+coverage 3/12 cells (25.0%) · 9 unspecified (warn)
+notes
+  ○ alice  select
+tags
+  ○ alice  select, insert, update, delete
+note_events
+  ○ alice  select, insert, update, delete
+0 failed · 3 passed · 3 inconclusive

@@ -154,6 +154,43 @@ pub fn is_denied(err: &postgres::Error) -> bool {
     err.code() == Some(&SqlState::INSUFFICIENT_PRIVILEGE)
 }
 
+/// A `42501` the statement raised about `schema.table` itself (§4.3): no `CONTEXT`, so not from a
+/// trigger or a function, and the message names the table or its schema. Names, not wording, so any
+/// `lc_messages` works.
+pub fn is_denied_on(err: &postgres::Error, schema: &str, table: &str) -> bool {
+    let Some(db) = err.as_db_error().filter(|_| is_denied(err)) else {
+        return false;
+    };
+    let nested = db
+        .where_()
+        .is_some_and(|context| !context.trim().is_empty());
+    !nested && (names(db.message(), table) || names(db.message(), schema))
+}
+
+/// `describe`, plus the outermost frame of the error's context: the trigger or function it came from.
+pub fn describe_with_context(err: &postgres::Error) -> String {
+    let text = describe(err);
+    match err
+        .as_db_error()
+        .and_then(|db| db.where_())
+        .and_then(|context| context.lines().rev().find(|l| !l.trim().is_empty()))
+    {
+        Some(frame) => format!("{text}, from {}", frame.trim()),
+        None => text,
+    }
+}
+
+/// Whether `word` appears in `text` with no identifier character on either side.
+fn names(text: &str, word: &str) -> bool {
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    !word.is_empty()
+        && text.match_indices(word).any(|(at, _)| {
+            let before = text[..at].chars().next_back();
+            let after = text[at + word.len()..].chars().next();
+            !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
+        })
+}
+
 pub fn describe(err: &postgres::Error) -> String {
     match err.as_db_error() {
         Some(db) => format!("{} (SQLSTATE {})", db.message(), db.code().code()),
@@ -172,6 +209,23 @@ pub fn describe(err: &postgres::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_match_whole_words_only() {
+        let rls = "new row violates row-level security policy for table \"notes\"";
+        assert!(names(rls, "notes"));
+        assert!(!names(rls, "note"));
+        assert!(names("permission denied for table notes", "notes"));
+        assert!(!names(
+            "permission denied for sequence notes_id_seq",
+            "notes"
+        ));
+        assert!(!names("permission denied for table audit_notes", "notes"));
+        assert!(!names("permission denied for table notes2", "notes"));
+        assert!(names("permission denied for schema app", "app"));
+        assert!(names("permissão negada para tabela promoções", "promoções"));
+        assert!(!names("anything", ""));
+    }
 
     #[test]
     fn identifiers_are_quoted() {
