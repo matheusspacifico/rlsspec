@@ -1,0 +1,135 @@
+# Who may do what with the shared todo lists. Every identity × table × operation is specified.
+version: 1
+preset: supabase                  # identities' `claims` become the JWT settings auth.uid() reads
+
+database:
+  url: ${env:DATABASE_URL}
+  schemas: [public]
+
+setup:
+  - seed.sql
+
+vars:
+  alice: 1a1ce000-0000-4000-8000-00000000a11c   # owns Groceries (shared with carol) and Reading (public)
+  bob: b0b00000-0000-4000-8000-000000000b0b     # owns Chores and Recipes (public)
+  carol: ca201000-0000-4000-8000-0000000ca201   # owns nothing, collaborates on Groceries
+  groceries: 11570000-0000-4000-8000-000000000001
+  reading: 11570000-0000-4000-8000-000000000002
+  chores: 11570000-0000-4000-8000-000000000003
+  recipes: 11570000-0000-4000-8000-000000000004
+
+# As PostgREST would run them: no JWT, or a JWT whose `sub` is the user (`role: authenticated` is added).
+identities:
+  anon:
+    role: anon
+    claims: { role: anon }
+  alice:
+    role: authenticated
+    claims: { sub: "${alice}" }
+  bob:
+    role: authenticated
+    claims: { sub: "${bob}" }
+  carol:
+    role: authenticated
+    claims: { sub: "${carol}" }
+
+unspecified: fail
+
+defaults:
+  anon:                           # visitors only read public lists and their todos
+    "*": { select: deny, insert: deny, update: deny, delete: deny }
+    lists: { select: { rows: "is_public" } }
+    todos: { select: { rows: "list_id in (${reading}, ${recipes})" } }
+  bob:
+    shares: { select: deny, update: deny, delete: deny }  # nothing of his is shared
+  alice:
+    shares: { update: deny }                               # shares are added and removed, never edited
+  carol:
+    shares: { update: deny }
+
+expect:
+  lists:
+    alice:
+      select: { rows: "owner_id = ${alice} or is_public" }
+      insert:
+        - { values: { owner_id: "${alice}", title: "Packing" }, expect: allow }
+        - { values: { owner_id: "${bob}", title: "Packing" }, expect: deny }       # not in someone else's name
+      update:
+        - { where: "owner_id = ${alice}", expect: allow }
+        - { where: "owner_id = ${bob}", expect: deny }                            # Recipes is public, still bob's
+        - { where: "id = ${groceries}", set: { owner_id: "${bob}" }, expect: deny }  # can't give a list away
+      delete:
+        - { where: "owner_id = ${alice}", expect: allow }
+        - { where: "owner_id = ${bob}", expect: deny }
+    bob:
+      select: { rows: "owner_id = ${bob} or is_public" }
+      insert:
+        - { values: { owner_id: "${bob}", title: "Garden" }, expect: allow }
+        - { values: { owner_id: "${alice}", title: "Garden" }, expect: deny }
+      update:
+        - { where: "owner_id = ${bob}", expect: allow }
+        - { where: "owner_id = ${alice}", expect: deny }
+      delete:
+        - { where: "owner_id = ${bob}", expect: allow }
+        - { where: "owner_id = ${alice}", expect: deny }
+    carol:
+      select: { rows: "id = ${groceries} or is_public" }                          # shared with her, or public
+      insert:
+        - { values: { owner_id: "${carol}", title: "Books" }, expect: allow }
+      update:
+        - { where: "id = ${groceries}", set: { title: "Food" }, expect: deny }      # a share doesn't rename
+      delete: deny
+
+  todos:
+    alice:
+      select: { rows: "list_id <> ${chores}" }
+      insert:
+        - { values: { list_id: "${groceries}", owner_id: "${alice}", title: "Bread" }, expect: allow }
+        - { values: { list_id: "${groceries}", owner_id: "${carol}", title: "Bread" }, expect: deny }
+        - { values: { list_id: "${recipes}", owner_id: "${alice}", title: "Soup" }, expect: deny }  # public, not hers
+      update:
+        - { where: "list_id = ${groceries}", set: { done: "true" }, expect: allow }  # carol's Eggs too
+        - { where: "list_id = ${recipes}", set: { done: "true" }, expect: deny }
+        - { where: "list_id = ${groceries}", set: { list_id: "${recipes}" }, expect: deny }  # not into bob's list
+      delete:
+        - { where: "list_id = ${groceries}", expect: allow }
+        - { where: "list_id = ${recipes}", expect: deny }
+    bob:
+      select: { rows: "list_id <> ${groceries}" }
+      insert:
+        - { values: { list_id: "${chores}", owner_id: "${bob}", title: "Dishes" }, expect: allow }
+        - { values: { list_id: "${groceries}", owner_id: "${bob}", title: "Cake" }, expect: deny }
+      update:
+        - { where: "list_id = ${chores}", set: { done: "true" }, expect: allow }
+        - { where: "list_id = ${reading}", set: { done: "true" }, expect: deny }
+      delete:
+        - { where: "list_id = ${chores}", expect: allow }
+        - { where: "list_id = ${reading}", expect: deny }
+    carol:
+      select: { rows: "list_id <> ${chores}" }
+      insert:
+        - { values: { list_id: "${groceries}", owner_id: "${carol}", title: "Tea" }, expect: allow }
+        - { values: { list_id: "${groceries}", owner_id: "${alice}", title: "Tea" }, expect: deny }  # in her own name only
+        - { values: { list_id: "${reading}", owner_id: "${carol}", title: "Tea" }, expect: deny }
+      update:
+        - { where: "list_id = ${groceries}", set: { done: "true" }, expect: allow }
+        - { where: "list_id = ${reading}", set: { done: "true" }, expect: deny }
+      delete: deny                                                                 # only the list owner deletes
+
+  shares:
+    alice:
+      select: { rows: "list_id = ${groceries}" }
+      insert:
+        - { values: { list_id: "${reading}", user_id: "${bob}" }, expect: allow }
+        - { values: { list_id: "${chores}", user_id: "${alice}" }, expect: deny }   # can't join bob's list
+      delete:
+        - { where: "list_id = ${groceries}", expect: allow }
+    bob:
+      insert:
+        - { values: { list_id: "${groceries}", user_id: "${bob}" }, expect: deny }
+    carol:
+      select: { rows: "user_id = ${carol}" }
+      insert:
+        - { values: { list_id: "${groceries}", user_id: "${bob}" }, expect: deny }  # only the owner shares
+      delete:
+        - { where: "user_id = ${carol}", expect: allow }                           # she can leave the list

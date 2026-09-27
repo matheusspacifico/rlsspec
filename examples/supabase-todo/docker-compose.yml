@@ -1,0 +1,17 @@
+services:
+  db:
+    image: supabase/postgres:17.6.1.143
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54330:5432"
+    volumes:
+      # Named after the image's own migrate.sh, so they run once the auth schema and roles exist.
+      - ./schema.sql:/docker-entrypoint-initdb.d/zz-1-schema.sql:ro
+      - ./policies.sql:/docker-entrypoint-initdb.d/zz-2-policies.sql:ro
+    healthcheck:
+      # Over TCP: during initialisation the server only listens on its unix socket.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 120

@@ -1,0 +1,65 @@
+---
+source: tests/supabase.rs
+expression: out
+---
+lists
+  ✓ alice  select  rows: owner_id = '…a11c' or is_public                          3 visible
+  ✓ alice  insert  values (owner_id = '…a11c', title = 'Packing') → allow         inserted
+  ✓ alice  insert  values (owner_id = '…0b0b', title = 'Packing') → deny          permission denied
+  ✓ alice  update  where owner_id = '…a11c' → allow                               affected 2 of 2 rows
+  ✓ alice  update  where owner_id = '…0b0b' → deny                                affected 0 of 2 rows
+  ✓ alice  update  where id = '…0001' set owner_id = '…0b0b' → deny               permission denied
+  ✓ alice  delete  where owner_id = '…a11c' → allow                               affected 2 of 2 rows
+  ✓ alice  delete  where owner_id = '…0b0b' → deny                                affected 0 of 2 rows
+  ✓ bob    select  rows: owner_id = '…0b0b' or is_public                          3 visible
+  ✓ bob    insert  values (owner_id = '…0b0b', title = 'Garden') → allow          inserted
+  ✓ bob    insert  values (owner_id = '…a11c', title = 'Garden') → deny           permission denied
+  ✓ bob    update  where owner_id = '…0b0b' → allow                               affected 2 of 2 rows
+  ✓ bob    update  where owner_id = '…a11c' → deny                                affected 0 of 2 rows
+  ✓ bob    delete  where owner_id = '…0b0b' → allow                               affected 2 of 2 rows
+  ✓ bob    delete  where owner_id = '…a11c' → deny                                affected 0 of 2 rows
+  ✓ carol  select  rows: id = '…0001' or is_public                                3 visible
+  ✓ carol  insert  values (owner_id = '…a201', title = 'Books') → allow           inserted
+  ✓ carol  update  where id = '…0001' set title = 'Food' → deny                   affected 0 of 1 rows
+  ✓ carol  delete  deny                                                           affected 0 of 4 rows
+  ✓ anon   *       select rows: is_public, insert deny, update deny, delete deny  4/4 ops
+todos
+  ✓ alice  select  rows: list_id <> '…0003'                                                           4 visible
+  ✓ alice  insert  values (list_id = '…0001', owner_id = '…a11c', title = 'Bread') → allow            inserted
+  ✓ alice  insert  values (list_id = '…0001', owner_id = '…a201', title = 'Bread') → deny             permission denied
+  ✓ alice  insert  values (list_id = '…0004', owner_id = '…a11c', title = 'Soup') → deny              permission denied
+  ✓ alice  update  where list_id = '…0001' set done = true → allow                                    affected 2 of 2 rows
+  ✓ alice  update  where list_id = '…0004' set done = true → deny                                     affected 0 of 1 rows
+  ✓ alice  update  where list_id = '…0001' set list_id = '…0004' → deny                               permission denied
+  ✓ alice  delete  where list_id = '…0001' → allow                                                    affected 2 of 2 rows
+  ✓ alice  delete  where list_id = '…0004' → deny                                                     affected 0 of 1 rows
+  ✓ bob    select  rows: list_id <> '…0001'                                                           3 visible
+  ✓ bob    insert  values (list_id = '…0003', owner_id = '…0b0b', title = 'Dishes') → allow           inserted
+  ✓ bob    insert  values (list_id = '…0001', owner_id = '…0b0b', title = 'Cake') → deny              permission denied
+  ✓ bob    update  where list_id = '…0003' set done = true → allow                                    affected 1 of 1 rows
+  ✓ bob    update  where list_id = '…0002' set done = true → deny                                     affected 0 of 1 rows
+  ✓ bob    delete  where list_id = '…0003' → allow                                                    affected 1 of 1 rows
+  ✓ bob    delete  where list_id = '…0002' → deny                                                     affected 0 of 1 rows
+  ✓ carol  select  rows: list_id <> '…0003'                                                           4 visible
+  ✓ carol  insert  values (list_id = '…0001', owner_id = '…a201', title = 'Tea') → allow              inserted
+  ✓ carol  insert  values (list_id = '…0001', owner_id = '…a11c', title = 'Tea') → deny               permission denied
+  ✓ carol  insert  values (list_id = '…0002', owner_id = '…a201', title = 'Tea') → deny               permission denied
+  ✓ carol  update  where list_id = '…0001' set done = true → allow                                    affected 2 of 2 rows
+  ✓ carol  update  where list_id = '…0002' set done = true → deny                                     affected 0 of 1 rows
+  ✗ carol  delete  deny                                                                               affected 2 of 5 rows (expected 0)
+  ✓ anon   *       select rows: list_id in ('…0002', '…0004'), insert deny, update deny, delete deny  4/4 ops
+shares
+  ✓ alice  select  rows: list_id = '…0001'                                1 visible
+  ✓ alice  insert  values (list_id = '…0002', user_id = '…0b0b') → allow  inserted
+  ✓ alice  insert  values (list_id = '…0003', user_id = '…a11c') → deny   permission denied
+  ✓ alice  *       update deny                                            1/1 ops
+  ✓ alice  delete  where list_id = '…0001' → allow                        affected 1 of 1 rows
+  ✓ bob    *       deny                                                   3/3 ops
+  ✓ bob    insert  values (list_id = '…0001', user_id = '…0b0b') → deny   permission denied
+  ✓ carol  select  rows: user_id = '…a201'                                1 visible
+  ✓ carol  insert  values (list_id = '…0001', user_id = '…0b0b') → deny   permission denied
+  ✓ carol  *       update deny                                            1/1 ops
+  ✓ carol  delete  where user_id = '…a201' → allow                        affected 1 of 1 rows
+  ✓ anon   *       deny                                                   4/4 ops
+coverage 48/48 cells (100.0%) · 0 unspecified (fail)
+1 failed · 66 passed · 0 inconclusive

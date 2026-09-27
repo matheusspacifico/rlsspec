@@ -1,0 +1,9 @@
+---
+source: tests/supabase.rs
+expression: out.stdout
+---
+        anon  alice  bob   carol
+lists   SIUD  SIUD   SIUD  SIUD
+todos   SIUD  SIUD   SIUD  SIUD
+shares  SIUD  SIUD   SIUD  SIUD
+coverage 48/48 cells (100.0%) · 0 unspecified (fail)

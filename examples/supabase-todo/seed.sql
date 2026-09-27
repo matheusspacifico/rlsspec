@@ -1,0 +1,22 @@
+-- Fixture rows. rlsspec runs this as its `setup`, inside its transaction, and rolls it back.
+-- Users are plain uuids: the policies only compare them with auth.uid().
+--   alice  1a1ce000-0000-4000-8000-00000000a11c
+--   bob    b0b00000-0000-4000-8000-000000000b0b
+--   carol  ca201000-0000-4000-8000-0000000ca201
+
+insert into lists (id, owner_id, title, is_public) values
+    ('11570000-0000-4000-8000-000000000001', '1a1ce000-0000-4000-8000-00000000a11c', 'Groceries', false),
+    ('11570000-0000-4000-8000-000000000002', '1a1ce000-0000-4000-8000-00000000a11c', 'Reading', true),
+    ('11570000-0000-4000-8000-000000000003', 'b0b00000-0000-4000-8000-000000000b0b', 'Chores', false),
+    ('11570000-0000-4000-8000-000000000004', 'b0b00000-0000-4000-8000-000000000b0b', 'Recipes', true);
+
+-- Alice shares her groceries with carol.
+insert into shares (list_id, user_id) values
+    ('11570000-0000-4000-8000-000000000001', 'ca201000-0000-4000-8000-0000000ca201');
+
+insert into todos (list_id, owner_id, title) values
+    ('11570000-0000-4000-8000-000000000001', '1a1ce000-0000-4000-8000-00000000a11c', 'Milk'),
+    ('11570000-0000-4000-8000-000000000001', 'ca201000-0000-4000-8000-0000000ca201', 'Eggs'),
+    ('11570000-0000-4000-8000-000000000002', '1a1ce000-0000-4000-8000-00000000a11c', 'Dune'),
+    ('11570000-0000-4000-8000-000000000003', 'b0b00000-0000-4000-8000-000000000b0b', 'Laundry'),
+    ('11570000-0000-4000-8000-000000000004', 'b0b00000-0000-4000-8000-000000000b0b', 'Pancakes');
