@@ -1,0 +1,25 @@
+# rust
+/target/
+**/*.rs.bk
+
+# insta
+*.snap.new
+*.pending-snap
+
+# local environment
+.env
+.env.*
+!.env.example
+
+# personal planning & tracking
+/notes/
+
+# local settings
+.claude/settings.local.json
+
+# editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
