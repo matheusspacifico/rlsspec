@@ -1,6 +1,7 @@
 pub mod catalog;
 pub mod config;
 pub mod identity;
+pub mod init;
 pub mod pg;
 pub mod report;
 pub mod runner;

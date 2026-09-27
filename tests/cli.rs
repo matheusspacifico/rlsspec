@@ -101,3 +101,34 @@ fn colour_can_be_forced_and_disabled() {
     assert_eq!(plain.code, Some(2));
     assert!(!plain.stderr.contains('\x1b'), "{:?}", plain.stderr);
 }
+
+#[test]
+fn init_refuses_remote_hosts() {
+    let output = format!("{}/init_remote.yaml", env!("CARGO_TARGET_TMPDIR"));
+    let out = rlsspec_with_env(
+        &["init", "-o", &output],
+        &[("DATABASE_URL", "postgres://u:secret@db.example.com/app")],
+    );
+    assert_eq!(out.code, Some(2));
+    assert_eq!(
+        out.stderr,
+        "error: refusing to connect to non-local host `db.example.com`; list it under `safety.allowed_hosts` or pass --allow-remote\n"
+    );
+    assert!(!std::path::Path::new(&output).exists());
+}
+
+#[test]
+fn init_needs_database_url() {
+    let output = format!("{}/init_no_url.yaml", env!("CARGO_TARGET_TMPDIR"));
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_rlsspec"))
+        .args(["init", "-o", &output])
+        .env_remove("DATABASE_URL")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .starts_with("error: `DATABASE_URL` is not set")
+    );
+}

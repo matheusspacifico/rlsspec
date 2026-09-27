@@ -1,9 +1,11 @@
-use std::path::PathBuf;
+use std::env;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use rlsspec::config::{self, Config, ConfigError, Source};
+use rlsspec::init::{self, InitError};
 use rlsspec::pg::PgError;
 use rlsspec::runner::{self, RunError};
 use rlsspec::{report, safety, style};
@@ -38,6 +40,18 @@ enum Command {
     Test,
     /// Print which identity × table × operation cells have a case, without running any
     Cover,
+    /// Write a spec from the database (DATABASE_URL) with every identity × table × operation `todo`
+    Init {
+        /// Schemas whose tables are in scope
+        #[arg(long, value_delimiter = ',', default_value = "public")]
+        schemas: Vec<String>,
+        /// Where to write the spec
+        #[arg(short, long, default_value = "rlsspec.yaml")]
+        output: PathBuf,
+        /// Overwrite the output file if it exists
+        #[arg(long)]
+        force: bool,
+    },
     /// Print the version
     Version,
 }
@@ -70,6 +84,11 @@ fn run(cli: &Cli) -> Result<ExitCode> {
         }
         Command::Test => test(cli),
         Command::Cover => cover(cli),
+        Command::Init {
+            ref schemas,
+            ref output,
+            force,
+        } => init(cli, schemas, output, force),
     }
 }
 
@@ -85,6 +104,26 @@ fn cover(cli: &Cli) -> Result<ExitCode> {
     let coverage = runner::cover(&config, &source)?;
     anstream::print!("{}", report::text::render_cover(&coverage));
     Ok(ExitCode::from(u8::from(coverage.fails())))
+}
+
+fn init(cli: &Cli, schemas: &[String], output: &Path, force: bool) -> Result<ExitCode> {
+    if !force && output.exists() {
+        return Err(InitError::Exists(output.to_path_buf()).into());
+    }
+    let Ok(url) = env::var("DATABASE_URL") else {
+        bail!("`DATABASE_URL` is not set; init reads the database to scaffold the spec from it");
+    };
+    safety::check(&url, &[], cli.allow_remote)?;
+    let scaffold = init::introspect(&url, schemas)?;
+    init::write(output, &init::render(&scaffold), force)?;
+    println!(
+        "wrote {}: {} tables × {} identities, {} cells todo",
+        output.display(),
+        scaffold.tables.len(),
+        scaffold.identities.len(),
+        scaffold.cells()
+    );
+    Ok(ExitCode::SUCCESS)
 }
 
 fn load(cli: &Cli) -> Result<(Config, Source)> {
