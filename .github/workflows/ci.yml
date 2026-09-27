@@ -30,7 +30,12 @@ jobs:
       - run: cargo clippy --all-targets --locked -- -D warnings
 
   test:
+    name: test (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ["14", "17"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -38,3 +43,4 @@ jobs:
       - run: cargo test --locked
         env:
           INSTA_UPDATE: "no"
+          RLSSPEC_PG_TAG: ${{ matrix.postgres }}
