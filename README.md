@@ -71,12 +71,13 @@ Working now:
   work (see [Supabase](#supabase)).
 - **`rlsspec lint`** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`,
   unsafe `SECURITY DEFINER` functions, views that bypass RLS, grants nobody should use (see [Lint](#lint)).
-- **CI-friendly** exit codes: `0` all good, `1` failures or lint errors, `2` config/connection errors or
-  inconclusive cases.
+- **CI-friendly**: exit codes `0` all good, `1` failures or lint errors, `2` config/connection errors or
+  inconclusive cases; `--format json` and `--format junit` reports (see [Output formats](#output-formats)).
+- **TLS** with libpq's `sslmode`, required for any non-local host (see [Safety](#safety)).
 
 Planned for v0.1:
 
-- JSON and JUnit output, prebuilt binaries, a GitHub Action.
+- Prebuilt binaries, a GitHub Action.
 
 ## Getting started
 
@@ -228,8 +229,28 @@ An entry matches every finding of its rule whose keys all match: without `table`
 `table`, `identity`, `function` or `view` (`name` or `schema.name`) as fits the finding. An entry that matches
 nothing is reported as a stale ignore, so ignores can't outlive what they excused.
 
-Commands: `test`, `cover`, `lint`, `init`, `version`. Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
-`--no-color`.
+### Output formats
+
+`test`, `lint` and `cover` take `--format text|json|junit` (`text` is the default; `cover` has no JUnit
+report). JSON and JUnit go to stdout without colour, and the exit code is the same whatever the format.
+Config and connection errors are always plain text on stderr, with nothing on stdout.
+
+- **JSON**: one document per run, starting with `"schema_version": 1` and ending with `"exit_code"`. `test`
+  lists every case (`table`, `identity`, `op`, `origin`, `description`, `outcome`, `detail` and its
+  `location` in the spec), the coverage with its gaps, and the totals; `cover` the matrix; `lint` the findings,
+  the ignored count and the skipped rules. A breaking change to the format bumps `schema_version`.
+- **JUnit**: for CI test reporters. `test` has one suite per table and one test per case (a failure is a
+  `<failure>`, an inconclusive case an `<error>`), plus a `coverage` suite under `unspecified: fail`. `lint`
+  has one suite per rule: errors fail, warnings and info pass with their hint in the output, as they do for
+  the exit code.
+
+```console
+$ rlsspec test --format junit > rlsspec.xml
+```
+
+Commands: `test`, `cover`, `lint`, `init`, `version`. Useful flags: `-c/--config <file>`, `--format`,
+`--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`), `--allow-insecure` (a non-local
+host without TLS), `--no-color`.
 
 ## Safety
 
@@ -246,6 +267,20 @@ role, so:
   side effects outside the database.
 - `rlsspec.yaml` contains SQL that is executed as written. Only run specs you trust.
 - Reports can include primary keys of real rows.
+
+**TLS.** `sslmode` in the connection string works as in `psql`: `disable`, `prefer` (the default: TLS when the
+server offers it), `require` (always encrypted, certificate not checked), `verify-ca` (signed by a trusted CA)
+and `verify-full` (and issued for that host). Trusted CAs are your system's plus Mozilla's, or the PEM file in
+`sslrootcert` for a private CA:
+
+```console
+$ export DATABASE_URL="postgres://ci:…@db.staging.internal/app?sslmode=verify-full&sslrootcert=ca.pem"
+```
+
+A non-local host (listed in `safety.allowed_hosts` or let through by `--allow-remote`) must use TLS: `prefer`
+becomes `require`, and `sslmode=disable` is refused unless you pass `--allow-insecure`. `--allow-remote` and
+`--allow-insecure` each print a warning naming the host. `sslmode=allow` and client certificates are not
+supported.
 
 This software is provided "as is", without warranty of any kind; see the [license](#license).
 
