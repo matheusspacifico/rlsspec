@@ -28,7 +28,6 @@ pub fn render(report: &Report) -> String {
                     Outcome::Pass(detail) => (style::PASS, "✓", detail.as_str()),
                     Outcome::Fail(detail) => (style::FAIL, "✗", detail.as_str()),
                     Outcome::Inconclusive(detail) => (style::INCONCLUSIVE, "?", detail.as_str()),
-                    Outcome::Unsupported => (style::INCONCLUSIVE, "?", "not supported yet"),
                 };
                 let cells = [
                     mark.to_owned(),
@@ -108,7 +107,7 @@ fn shorten_literals(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runner::{CaseResult, Op};
+    use crate::runner::{CaseResult, Op, Origin};
 
     fn report() -> Report {
         let case = |identity: &str, outcome| CaseResult {
@@ -117,12 +116,13 @@ mod tests {
             op: Op::Select,
             description: "deny".into(),
             outcome,
+            origin: Origin::Expect,
         };
         Report {
             results: vec![
                 case("alice", Outcome::Pass("0 visible".into())),
                 case("guest", Outcome::Fail("leaked 1 of 2 rows: id=1".into())),
-                case("bob", Outcome::Unsupported),
+                case("bob", Outcome::Inconclusive("vacuous".into())),
             ],
         }
     }
@@ -136,7 +136,7 @@ mod tests {
             "notes
   ✓ alice  select  deny  0 visible
   ✗ guest  select  deny  leaked 1 of 2 rows: id=1
-  ? bob    select  deny  not supported yet
+  ? bob    select  deny  vacuous
 1 failed · 1 passed · 1 inconclusive
 "
         );

@@ -1,0 +1,11 @@
+---
+source: tests/writes.rs
+expression: out.stderr
+---
+error: table notes already has a block for `alice` at line 7; merge the two
+ --> tests/fixtures/writes/duplicate.yaml:9:3
+  |
+9 |   public.notes:
+  |   ^
+
+error: stopped before running any case (1 error in tests/fixtures/writes/duplicate.yaml)

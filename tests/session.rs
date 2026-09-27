@@ -26,12 +26,6 @@ fn vacuous_predicate_is_inconclusive() {
 }
 
 #[test]
-fn unsupported_cases_are_inconclusive() {
-    let out = failing("unsupported");
-    insta::assert_snapshot!(out.stdout);
-}
-
-#[test]
 fn predicates_cannot_smuggle_a_second_statement() {
     let out = failing("injection");
     insta::assert_snapshot!(out.stdout);

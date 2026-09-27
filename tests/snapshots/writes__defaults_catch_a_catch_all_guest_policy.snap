@@ -1,0 +1,21 @@
+---
+source: tests/writes.rs
+expression: "report(\"defaults_guest_all_true\", 1)"
+---
+notes
+  ✓ alice  select  all                                6 visible
+  ✓ alice  update  where tenant_id = '…000a' → allow  affected 3 of 3 rows
+  ✓ alice  delete  deny                               affected 0 of 6 rows
+  ✗ guest  select  deny                               leaked 6 of 6 rows: id=1, id=2, id=3, id=4, id=5, …
+  ✓ guest  insert  deny                               deny (no privilege)
+  ✗ guest  update  deny                               affected 6 of 6 rows (expected 0)
+  ✓ guest  delete  deny                               permission denied
+tags
+  ✓ alice  select  rows: tenant_id = '…000a'  1 visible
+  ✓ alice  update  deny                       denied: no UPDATE privilege
+  ✓ alice  delete  deny                       permission denied
+  ✓ guest  select  deny                       permission denied
+  ✓ guest  insert  deny                       deny (no privilege)
+  ✓ guest  update  deny                       denied: no UPDATE privilege
+  ✓ guest  delete  deny                       permission denied
+2 failed · 12 passed · 0 inconclusive

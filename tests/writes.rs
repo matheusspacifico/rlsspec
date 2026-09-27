@@ -93,3 +93,20 @@ fn insert_deny_pass_without_a_privilege_or_a_policy() {
 fn insert_deny_fails_when_a_public_permissive_policy_applies() {
     insta::assert_snapshot!(report("insert_deny_public_policy", 1));
 }
+
+#[test]
+fn defaults_expand_to_every_table_and_yield_to_specific_entries() {
+    insta::assert_snapshot!(report("defaults_pass", 0));
+}
+
+#[test]
+fn defaults_catch_a_catch_all_guest_policy() {
+    insta::assert_snapshot!(report("defaults_guest_all_true", 1));
+}
+
+#[test]
+fn two_blocks_for_the_same_table_and_identity_are_located() {
+    let out = run("duplicate", 2);
+    assert_eq!(out.stdout, "");
+    insta::assert_snapshot!(out.stderr);
+}

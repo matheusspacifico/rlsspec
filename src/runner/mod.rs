@@ -1,14 +1,13 @@
 mod insert_deny;
+mod plan;
 mod select;
 mod write;
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use crate::catalog::{self, Catalog, Table};
 use crate::config::{
-    Block, Config, ConfigError, Diagnostic, Expectation, Identity, Ops, Source, Span, TableRef,
-    Writes,
+    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, TableRef, Writes,
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session};
@@ -56,7 +55,13 @@ pub enum Outcome {
     Pass(String),
     Fail(String),
     Inconclusive(String),
-    Unsupported,
+}
+
+/// Where a case came from: an `expect` entry, or `defaults` (a named table or `*`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    Expect,
+    Default,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +71,7 @@ pub struct CaseResult {
     pub op: Op,
     pub description: String,
     pub outcome: Outcome,
+    pub origin: Origin,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -81,14 +87,8 @@ pub struct Totals {
 }
 
 impl Report {
-    fn push(&mut self, table: &str, identity: &str, op: Op, description: String, outcome: Outcome) {
-        self.results.push(CaseResult {
-            table: table.to_owned(),
-            identity: identity.to_owned(),
-            op,
-            description,
-            outcome,
-        });
+    fn push(&mut self, result: CaseResult) {
+        self.results.push(result);
     }
 
     pub fn totals(&self) -> Totals {
@@ -97,7 +97,7 @@ impl Report {
             match result.outcome {
                 Outcome::Pass(_) => totals.passed += 1,
                 Outcome::Fail(_) => totals.failed += 1,
-                Outcome::Inconclusive(_) | Outcome::Unsupported => totals.inconclusive += 1,
+                Outcome::Inconclusive(_) => totals.inconclusive += 1,
             }
         }
         totals
@@ -124,10 +124,9 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
 
     let mut diagnostics = Vec::new();
     let tables = resolve_tables(config, &catalog, &mut diagnostics);
-    for (block, table) in config.expect.iter().chain(&config.defaults).zip(&tables) {
-        if let Some(table) = table {
-            check_columns(&block.ops, table, &catalog, &mut diagnostics);
-        }
+    let plan = plan::build(config, &tables, &catalog, &mut diagnostics);
+    for entry in &plan {
+        check_columns(entry, &catalog, &mut diagnostics);
     }
     preflight(&mut session, &config.identities, &mut diagnostics)?;
     if !diagnostics.is_empty() {
@@ -136,47 +135,22 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
         return Err(RunError::Config(source.invalid(diagnostics)));
     }
 
-    let identities: HashMap<&str, &Identity> = config
-        .identities
-        .iter()
-        .map(|i| (i.name.as_str(), i))
-        .collect();
-    let (expect_tables, default_tables) = tables.split_at(config.expect.len());
     let mut report = Report::default();
-    for (block, table) in config.expect.iter().zip(expect_tables) {
-        let (Some(table), Some(identity)) = (table, identities.get(block.identity.as_str())) else {
-            continue;
-        };
+    for entry in &plan {
         let cell = Cell {
-            table,
-            name: catalog.display_name(table),
-            identity,
+            entry,
+            name: catalog.display_name(entry.table),
             path: &source.path,
         };
-        cell.check(&mut session, &block.ops, &mut report)?;
-    }
-    for (block, table) in config.defaults.iter().zip(default_tables) {
-        let name = table_name(block, *table, &catalog);
-        if let Some(case) = &block.ops.select {
-            let description = select::describe(&case.select);
-            report.push(
-                &name,
-                &block.identity,
-                Op::Select,
-                description,
-                Outcome::Unsupported,
-            );
-        }
-        unsupported_writes(&name, block, &mut report);
+        cell.check(&mut session, &mut report)?;
     }
     session.rollback()?;
     Ok(report)
 }
 
 struct Cell<'a> {
-    table: &'a Table,
+    entry: &'a plan::Entry<'a>,
     name: String,
-    identity: &'a Identity,
     path: &'a Path,
 }
 
@@ -185,46 +159,72 @@ impl Cell<'_> {
         Location(self.path, span)
     }
 
-    fn push(&self, report: &mut Report, op: Op, description: String, outcome: Outcome) {
-        report.push(&self.name, &self.identity.name, op, description, outcome);
+    fn push(
+        &self,
+        report: &mut Report,
+        op: Op,
+        origin: Origin,
+        description: String,
+        outcome: Outcome,
+    ) {
+        report.push(CaseResult {
+            table: self.name.clone(),
+            identity: self.entry.identity.name.clone(),
+            op,
+            description,
+            outcome,
+            origin,
+        });
     }
 
-    fn check(&self, session: &mut Session, ops: &Ops, report: &mut Report) -> Result<(), RunError> {
-        let (table, identity) = (self.table, self.identity);
-        if let Some(case) = &ops.select {
+    fn check(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
+        let (table, identity) = (self.entry.table, self.entry.identity);
+        if let Some((case, origin)) = self.entry.select {
             let at = self.at(case.span);
             let outcome =
                 session.case(|tx| select::check(tx, table, identity, &case.select, at))??;
-            self.push(report, Op::Select, select::describe(&case.select), outcome);
+            self.push(
+                report,
+                Op::Select,
+                origin,
+                select::describe(&case.select),
+                outcome,
+            );
         }
-        match &ops.insert {
+        match self.entry.insert {
             // `insert: allow` is rejected when the config is loaded.
-            Some(Writes::Shorthand { expect, .. }) => {
+            Some((Writes::Shorthand { expect, .. }, origin)) => {
                 let outcome =
                     session.case(|tx| insert_deny::check(tx, table, &self.name, identity))??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Insert, description, outcome);
+                self.push(report, Op::Insert, origin, description, outcome);
             }
-            Some(Writes::Cases(cases)) => {
+            Some((Writes::Cases(cases), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let outcome =
                         session.case(|tx| write::insert(tx, table, identity, case, at))??;
-                    self.push(report, Op::Insert, write::describe_insert(case), outcome);
+                    self.push(
+                        report,
+                        Op::Insert,
+                        origin,
+                        write::describe_insert(case),
+                        outcome,
+                    );
                 }
             }
             None => {}
         }
-        match &ops.update {
-            Some(Writes::Shorthand { expect, span }) => {
+        match self.entry.update {
+            Some((Writes::Shorthand { expect, span }, origin)) => {
                 let at = self.at(*span);
                 let outcome = session.case(|tx| {
                     write::modify(tx, table, identity, Modify::Update(None), None, *expect, at)
                 })??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Update, description, outcome);
+                self.push(report, Op::Update, origin, description, outcome);
             }
-            Some(Writes::Cases(cases)) => {
+            Some((Writes::Cases(cases), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let set = case.set.as_deref();
@@ -241,21 +241,21 @@ impl Cell<'_> {
                         )
                     })??;
                     let description = write::describe_modify(&case.predicate, set, case.expect);
-                    self.push(report, Op::Update, description, outcome);
+                    self.push(report, Op::Update, origin, description, outcome);
                 }
             }
             None => {}
         }
-        match &ops.delete {
-            Some(Writes::Shorthand { expect, span }) => {
+        match self.entry.delete {
+            Some((Writes::Shorthand { expect, span }, origin)) => {
                 let at = self.at(*span);
                 let outcome = session.case(|tx| {
                     write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
                 })??;
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Delete, description, outcome);
+                self.push(report, Op::Delete, origin, description, outcome);
             }
-            Some(Writes::Cases(cases)) => {
+            Some((Writes::Cases(cases), origin)) => {
                 for case in cases {
                     let at = self.at(case.span);
                     let outcome = session.case(|tx| {
@@ -271,7 +271,7 @@ impl Cell<'_> {
                         )
                     })??;
                     let description = write::describe_modify(&case.predicate, None, case.expect);
-                    self.push(report, Op::Delete, description, outcome);
+                    self.push(report, Op::Delete, origin, description, outcome);
                 }
             }
             None => {}
@@ -281,13 +281,14 @@ impl Cell<'_> {
 }
 
 /// Every column in `values` and `set` must exist and be writable (not generated).
-fn check_columns(ops: &Ops, table: &Table, catalog: &Catalog, diagnostics: &mut Vec<Diagnostic>) {
-    let inserts = match &ops.insert {
-        Some(Writes::Cases(cases)) => cases.iter().map(|c| c.values.as_slice()).collect(),
+fn check_columns(entry: &plan::Entry, catalog: &Catalog, diagnostics: &mut Vec<Diagnostic>) {
+    let table = entry.table;
+    let inserts = match entry.insert {
+        Some((Writes::Cases(cases), _)) => cases.iter().map(|c| c.values.as_slice()).collect(),
         _ => Vec::new(),
     };
-    let updates = match &ops.update {
-        Some(Writes::Cases(cases)) => cases.iter().filter_map(|c| c.set.as_deref()).collect(),
+    let updates = match entry.update {
+        Some((Writes::Cases(cases), _)) => cases.iter().filter_map(|c| c.set.as_deref()).collect(),
         _ => Vec::new(),
     };
     let name = catalog.display_name(table);
@@ -342,14 +343,6 @@ fn resolve_tables<'c>(
         .collect()
 }
 
-fn table_name(block: &Block, table: Option<&Table>, catalog: &Catalog) -> String {
-    match (table, &block.table) {
-        (Some(table), _) => catalog.display_name(table),
-        (None, TableRef::Named(name)) => name.clone(),
-        (None, TableRef::All) => "*".to_owned(),
-    }
-}
-
 fn preflight(
     session: &mut Session,
     identities: &[Identity],
@@ -368,70 +361,4 @@ fn preflight(
         }
     }
     Ok(())
-}
-
-fn unsupported_writes(table: &str, block: &Block, report: &mut Report) {
-    let Ops {
-        insert,
-        update,
-        delete,
-        ..
-    } = &block.ops;
-    let mut push = |op, description| {
-        report.push(
-            table,
-            &block.identity,
-            op,
-            description,
-            Outcome::Unsupported,
-        );
-    };
-    match insert {
-        Some(Writes::Shorthand { expect, .. }) => push(Op::Insert, expectation(*expect).into()),
-        Some(Writes::Cases(cases)) => {
-            for case in cases {
-                let columns: Vec<&str> = case.values.iter().map(|a| a.column.as_str()).collect();
-                push(
-                    Op::Insert,
-                    format!(
-                        "values ({}) → {}",
-                        columns.join(", "),
-                        expectation(case.expect)
-                    ),
-                );
-            }
-        }
-        None => {}
-    }
-    match update {
-        Some(Writes::Shorthand { expect, .. }) => push(Op::Update, expectation(*expect).into()),
-        Some(Writes::Cases(cases)) => {
-            for case in cases {
-                push(
-                    Op::Update,
-                    format!("where {} → {}", case.predicate, expectation(case.expect)),
-                );
-            }
-        }
-        None => {}
-    }
-    match delete {
-        Some(Writes::Shorthand { expect, .. }) => push(Op::Delete, expectation(*expect).into()),
-        Some(Writes::Cases(cases)) => {
-            for case in cases {
-                push(
-                    Op::Delete,
-                    format!("where {} → {}", case.predicate, expectation(case.expect)),
-                );
-            }
-        }
-        None => {}
-    }
-}
-
-fn expectation(expect: Expectation) -> &'static str {
-    match expect {
-        Expectation::Allow => "allow",
-        Expectation::Deny => "deny",
-    }
 }
