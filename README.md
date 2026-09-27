@@ -67,11 +67,12 @@ Working now:
   a new table has no spec; `rlsspec cover` prints the matrix without running anything.
 - **`rlsspec init`** scaffolds a spec from the database, every cell marked `todo`.
 - **Vendor-neutral**: an identity is a Postgres role + session settings (GUCs), so it fits any RLS design.
+- A **`supabase` preset**: give an identity JWT `claims` and `auth.uid()`, `auth.role()` and `auth.jwt()` just
+  work (see [Supabase](#supabase)).
 - **CI-friendly** exit codes: `0` all good, `1` failures, `2` config/connection errors or inconclusive cases.
 
 Planned for v0.1:
 
-- A **`supabase` preset** that maps JWT claims so `auth.uid()` and friends just work.
 - **Lint** for common RLS foot-guns: RLS disabled or not forced, `BYPASSRLS` roles, `USING (true)`, unsafe
   `SECURITY DEFINER` functions, views that bypass RLS.
 - JSON and JUnit output, prebuilt binaries, a GitHub Action.
@@ -105,6 +106,9 @@ $ docker compose up -d --wait
 $ export DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres
 $ rlsspec test
 ```
+
+[`examples/supabase-todo`](examples/supabase-todo) is the same on Supabase: shared todo lists, policies on
+`auth.uid()`, the `supabase/postgres` image.
 
 ### Write your own spec
 
@@ -164,6 +168,27 @@ identity × table × operation with at least one case. `unspecified: warn` (the 
 hide behind a strict SELECT policy: rows the identity can't see are never updated. For update denies that
 matter, add a case that reads no column, which checks the UPDATE policies alone:
 `{ where: "true", set: { title: "x" }, expect: deny }`.
+
+### Supabase
+
+Add `preset: supabase` and give identities `claims`: rlsspec sets them the way PostgREST does for a request
+with that JWT, so policies on `auth.uid()`, `auth.role()` and `auth.jwt()` see the user.
+
+```yaml
+preset: supabase
+identities:
+  anon: { role: anon, claims: { role: anon } }
+  alice:
+    role: authenticated
+    claims: { sub: "${alice}", email: alice@example.com }   # role: authenticated is added
+```
+
+`claims` becomes `request.jwt.claims` (the whole mapping as JSON, nested values included) plus
+`request.jwt.claim.<name>` for each top-level string claim, which older `auth.uid()` versions read. Without a
+`role` claim the identity's role is added. Point `database.url` at the `postgres` role (it has `BYPASSRLS` and
+can switch to `anon` and `authenticated`), e.g. the Supabase CLI's local database:
+`postgres://postgres:postgres@127.0.0.1:54322/postgres`. `rlsspec init --preset supabase` scaffolds `anon`
+and `authenticated` instead of one identity per role; `service_role` bypasses RLS and is left out.
 
 Commands: `test`, `cover`, `init`, `version`. Useful flags: `-c/--config <file>`, `--allow-remote` (for hosts outside localhost and `safety.allowed_hosts`),
 `--no-color`.
