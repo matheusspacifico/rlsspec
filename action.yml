@@ -1,0 +1,62 @@
+name: rlsspec
+description: Check Postgres Row Level Security against a spec of expected access
+author: matheusspacifico
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  version:
+    description: >-
+      rlsspec release to run (0.1.0 or v0.1.0). Defaults to the action's ref when it is a release tag
+      (uses: matheusspacifico/rlsspec@v0.1.0); required when the action is used from a branch or a SHA.
+    required: false
+    default: ""
+  command:
+    description: test, lint or cover.
+    required: false
+    default: test
+  config:
+    description: Path to the spec file.
+    required: false
+    default: rlsspec.yaml
+  format:
+    description: text, json or junit (cover has no junit).
+    required: false
+    default: text
+  output:
+    description: >-
+      File to write the report to instead of the log (json or junit for a CI reporter; text is also shown
+      in the log). Written before the step fails on a non-zero exit.
+    required: false
+    default: ""
+  args:
+    description: Extra arguments, separated by whitespace (e.g. --allow-remote).
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: rlsspec's exit code (0 all good, 1 failures or lint errors, 2 config/connection/inconclusive).
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install rlsspec
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+        ACTION_REPOSITORY: ${{ github.action_repository }}
+      run: '"$GITHUB_ACTION_PATH/action/install.sh"'
+    - name: Run rlsspec
+      id: run
+      shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_ARGS: ${{ inputs.args }}
+      run: '"$GITHUB_ACTION_PATH/action/run.sh"'

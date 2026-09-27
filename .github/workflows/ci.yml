@@ -105,6 +105,58 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
 
+  action:
+    name: action (multitenant)
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:54329/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
+      - run: docker compose -f examples/multitenant/docker-compose.yml up -d --wait
+      # No release to download yet: RLSSPEC_ACTION_BINARY makes the action use this build.
+      - uses: ./
+        id: green
+        env:
+          RLSSPEC_ACTION_BINARY: ${{ github.workspace }}/target/debug/rlsspec
+        with:
+          config: examples/multitenant/rlsspec.yaml
+          format: junit
+          output: reports/rlsspec.xml
+      - uses: ./
+        env:
+          RLSSPEC_ACTION_BINARY: ${{ github.workspace }}/target/debug/rlsspec
+        with:
+          command: lint
+          config: examples/multitenant/rlsspec.yaml
+      - run: |
+          test "${{ steps.green.outputs.exit-code }}" = 0
+          grep -q '<testsuites name="rlsspec test" tests="89"' reports/rlsspec.xml
+      - run: docker compose -f examples/multitenant/docker-compose.yml exec -T db psql -q -U postgres < examples/multitenant/broken.sql
+      - uses: ./
+        id: red
+        continue-on-error: true
+        env:
+          RLSSPEC_ACTION_BINARY: ${{ github.workspace }}/target/debug/rlsspec
+        with:
+          config: examples/multitenant/rlsspec.yaml
+          format: junit
+          output: reports/broken.xml
+      # The step fails on exit 1, after writing the report.
+      - run: |
+          test "${{ steps.red.outcome }}" = failure
+          test "${{ steps.red.outputs.exit-code }}" = 1
+          grep -q '<failure' reports/broken.xml
+      # From a checkout, github.action_ref is not a release tag: without `version` the action refuses.
+      - uses: ./
+        id: unversioned
+        continue-on-error: true
+        with:
+          config: examples/multitenant/rlsspec.yaml
+      - run: test "${{ steps.unversioned.outcome }}" = failure
+
   supabase:
     name: supabase (preset + example)
     runs-on: ubuntu-latest
