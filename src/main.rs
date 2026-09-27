@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use rlsspec::config::{self, Config, ConfigError, Source};
 use rlsspec::init::{self, InitError};
 use rlsspec::lint;
-use rlsspec::pg::PgError;
+use rlsspec::pg::{PgError, Target};
 use rlsspec::preset::Preset;
 use rlsspec::runner::{self, RunError};
 use rlsspec::{report, safety, style};
@@ -131,8 +131,8 @@ fn run(cli: &Cli) -> Result<ExitCode> {
 }
 
 fn test(cli: &Cli, format: Format) -> Result<ExitCode> {
-    let (config, source) = load(cli)?;
-    let report = runner::run(&config, &source)?;
+    let (config, source, target) = load(cli)?;
+    let report = runner::run(&config, &source, &target)?;
     match format {
         Format::Text => anstream::print!("{}", report::text::render(&report)),
         Format::Json => print!("{}", report::json::render(&report)?),
@@ -142,8 +142,8 @@ fn test(cli: &Cli, format: Format) -> Result<ExitCode> {
 }
 
 fn cover(cli: &Cli, format: CoverFormat) -> Result<ExitCode> {
-    let (config, source) = load(cli)?;
-    let coverage = runner::cover(&config, &source)?;
+    let (config, source, target) = load(cli)?;
+    let coverage = runner::cover(&config, &source, &target)?;
     match format {
         CoverFormat::Text => anstream::print!("{}", report::text::render_cover(&coverage)),
         CoverFormat::Json => print!("{}", report::json::render_cover(&coverage)?),
@@ -152,8 +152,8 @@ fn cover(cli: &Cli, format: CoverFormat) -> Result<ExitCode> {
 }
 
 fn lint(cli: &Cli, format: Format) -> Result<ExitCode> {
-    let (config, source) = load(cli)?;
-    let report = lint::run(&config, &source)?;
+    let (config, source, target) = load(cli)?;
+    let report = lint::run(&config, &source, &target)?;
     match format {
         Format::Text => anstream::print!("{}", report::text::render_lint(&report)),
         Format::Json => print!("{}", report::json::render_lint(&report)?),
@@ -175,8 +175,9 @@ fn init(
     let Ok(url) = env::var("DATABASE_URL") else {
         bail!("`DATABASE_URL` is not set; init reads the database to scaffold the spec from it");
     };
-    safety::check(&url, &[], cli.allow_remote)?;
-    let scaffold = init::introspect(&url, schemas, preset)?;
+    let target = Target::parse(&url)?;
+    safety::check(&target, &[], cli.allow_remote)?;
+    let scaffold = init::introspect(&target, schemas, preset)?;
     init::write(output, &init::render(&scaffold), force)?;
     println!(
         "wrote {}: {} tables × {} identities, {} cells todo",
@@ -195,14 +196,11 @@ fn preset(name: &str) -> Result<Preset, String> {
     })
 }
 
-fn load(cli: &Cli) -> Result<(Config, Source)> {
+fn load(cli: &Cli) -> Result<(Config, Source, Target)> {
     let (config, source) = config::load(&cli.config)?;
-    safety::check(
-        &config.database.url,
-        &config.safety.allowed_hosts,
-        cli.allow_remote,
-    )?;
-    Ok((config, source))
+    let target = Target::parse(&config.database.url)?;
+    safety::check(&target, &config.safety.allowed_hosts, cli.allow_remote)?;
+    Ok((config, source, target))
 }
 
 fn located(err: &anyhow::Error) -> Option<&ConfigError> {

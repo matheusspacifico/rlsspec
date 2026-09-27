@@ -11,7 +11,7 @@ use crate::config::{
     Block, Config, ConfigError, Diagnostic, Identity, Source, Span, Spec, TableRef, Writes,
 };
 use crate::identity;
-use crate::pg::{self, PgError, Session};
+use crate::pg::{self, PgError, Session, Target};
 use coverage::Coverage;
 use write::Modify;
 
@@ -134,10 +134,11 @@ enum Preflight {
     RolesExist,
 }
 
-pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
+pub fn run(config: &Config, source: &Source, target: &Target) -> Result<Report, RunError> {
     in_session(
         config,
         source,
+        target,
         Preflight::Apply,
         |session, catalog, plan| {
             let mut report = Report {
@@ -159,28 +160,34 @@ pub fn run(config: &Config, source: &Source) -> Result<Report, RunError> {
 }
 
 /// Everything `run` does before the first case (setup, catalog, spec validation), then the coverage.
-pub fn cover(config: &Config, source: &Source) -> Result<Coverage, RunError> {
-    in_session(config, source, Preflight::Apply, |_, catalog, plan| {
-        Ok(coverage::compute(config, catalog, plan))
-    })
+pub fn cover(config: &Config, source: &Source, target: &Target) -> Result<Coverage, RunError> {
+    in_session(
+        config,
+        source,
+        target,
+        Preflight::Apply,
+        |_, catalog, plan| Ok(coverage::compute(config, catalog, plan)),
+    )
 }
 
 /// Everything `cover` does, except that no identity is applied: their roles must only exist.
 pub(crate) fn inspect<T>(
     config: &Config,
     source: &Source,
+    target: &Target,
     f: impl FnOnce(&mut Session, &Catalog, &[plan::Entry]) -> Result<T, RunError>,
 ) -> Result<T, RunError> {
-    in_session(config, source, Preflight::RolesExist, f)
+    in_session(config, source, target, Preflight::RolesExist, f)
 }
 
 fn in_session<T>(
     config: &Config,
     source: &Source,
+    target: &Target,
     preflight: Preflight,
     f: impl FnOnce(&mut Session, &Catalog, &[plan::Entry]) -> Result<T, RunError>,
 ) -> Result<T, RunError> {
-    let mut client = pg::connect(&config.database.url)?;
+    let mut client = pg::connect(target)?;
     let mut session = Session::begin(&mut client, &config.safety)?;
     session.run_setup(&config.setup)?;
     let catalog = catalog::load(session.tx(), &config.database.schemas)?;

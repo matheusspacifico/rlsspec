@@ -7,7 +7,7 @@ use postgres::Transaction;
 
 use crate::catalog;
 use crate::config::Safety;
-use crate::pg::{self, PgError, Session};
+use crate::pg::{self, PgError, Session, Target};
 use crate::preset::Preset;
 
 #[derive(Debug, thiserror::Error)]
@@ -123,11 +123,11 @@ ORDER BY 1";
 /// Reads the tables in `schemas` and the roles holding privileges on them, in a rolled-back
 /// transaction. With a preset, the preset decides which identities to scaffold.
 pub fn introspect(
-    url: &str,
+    target: &Target,
     schemas: &[String],
     preset: Option<Preset>,
 ) -> Result<Scaffold, InitError> {
-    let mut client = pg::connect(url)?;
+    let mut client = pg::connect(target)?;
     let mut session = Session::begin(&mut client, &Safety::default())?;
     let scaffold = scaffold(session.tx(), schemas, preset)?;
     session.rollback()?;

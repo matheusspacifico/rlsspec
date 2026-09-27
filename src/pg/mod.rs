@@ -1,12 +1,16 @@
 pub mod script;
+mod target;
+mod tls;
 
 use std::io;
 use std::path::{Path, PathBuf};
 
 use postgres::error::SqlState;
-use postgres::{Client, IsolationLevel, NoTls, Transaction};
+use postgres::{Client, IsolationLevel, Transaction};
 
 use crate::config::{ConfigError, Safety, Source};
+pub use target::{SslMode, Target, TargetError};
+pub use tls::TlsError;
 
 const MIN_SERVER_VERSION: i32 = 140000;
 
@@ -14,6 +18,8 @@ const MIN_SERVER_VERSION: i32 = 140000;
 pub enum PgError {
     #[error("cannot connect to the database: {}", describe(.0))]
     Connect(postgres::Error),
+    #[error(transparent)]
+    Tls(#[from] TlsError),
     #[error("PostgreSQL {0} is not supported; rlsspec needs PostgreSQL 14 or later")]
     UnsupportedVersion(String),
     #[error("database error: {}", describe(.0))]
@@ -36,8 +42,11 @@ impl From<postgres::Error> for PgError {
     }
 }
 
-pub fn connect(url: &str) -> Result<Client, PgError> {
-    let mut client = Client::connect(url, NoTls).map_err(PgError::Connect)?;
+pub fn connect(target: &Target) -> Result<Client, PgError> {
+    let mut client = target
+        .config
+        .connect(tls::connector(target)?)
+        .map_err(PgError::Connect)?;
     let row = client.query_one(
         "SELECT current_setting('server_version_num')::int, current_setting('server_version')",
         &[],

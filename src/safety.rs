@@ -2,18 +2,22 @@ use std::net::IpAddr;
 
 use postgres::config::Host;
 
+use crate::pg::Target;
+
 #[derive(Debug, thiserror::Error)]
 pub enum SafetyError {
-    #[error("`database.url` is not a valid connection string")]
-    InvalidUrl(#[source] postgres::Error),
     #[error(
         "refusing to connect to non-local host `{0}`; list it under `safety.allowed_hosts` or pass --allow-remote"
     )]
     RemoteHost(String),
 }
 
-pub fn check(url: &str, allowed_hosts: &[String], allow_remote: bool) -> Result<(), SafetyError> {
-    let config: postgres::Config = url.parse().map_err(SafetyError::InvalidUrl)?;
+pub fn check(
+    target: &Target,
+    allowed_hosts: &[String],
+    allow_remote: bool,
+) -> Result<(), SafetyError> {
+    let config = &target.config;
     if allow_remote {
         return Ok(());
     }
@@ -50,10 +54,9 @@ mod tests {
 
     fn refused(url: &str, allowed: &[&str]) -> Option<String> {
         let allowed: Vec<String> = allowed.iter().map(|s| s.to_string()).collect();
-        match check(url, &allowed, false) {
+        match check(&Target::parse(url).unwrap(), &allowed, false) {
             Ok(()) => None,
             Err(SafetyError::RemoteHost(host)) => Some(host),
-            Err(err) => panic!("unexpected error: {err}"),
         }
     }
 
@@ -101,14 +104,7 @@ mod tests {
 
     #[test]
     fn allow_remote_skips_the_host_check() {
-        assert!(check("postgres://db.example.com/db", &[], true).is_ok());
-    }
-
-    #[test]
-    fn invalid_urls_are_rejected_even_with_allow_remote() {
-        assert!(matches!(
-            check("postgres://localhost:notaport/db", &[], true),
-            Err(SafetyError::InvalidUrl(_))
-        ));
+        let target = Target::parse("postgres://db.example.com/db").unwrap();
+        assert!(check(&target, &[], true).is_ok());
     }
 }

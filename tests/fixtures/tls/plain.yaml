@@ -1,0 +1,10 @@
+# Runs only if the session is plain (see plain.sql). db.rlsspec.test is reached through hostaddr=127.0.0.1.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+safety: { allowed_hosts: [db.rlsspec.test] }
+setup: [plain.sql]
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }

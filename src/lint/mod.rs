@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use crate::catalog::lint::{self as facts, LintCatalog, RlsTable, RoleFacts};
 use crate::catalog::{Catalog, Table};
 use crate::config::{Config, Ignore, Source, Span};
+use crate::pg::Target;
 use crate::runner::plan::Entry;
 use crate::runner::{self, RunError};
 
@@ -111,8 +112,8 @@ impl LintReport {
 }
 
 /// Loads the spec like `cover` (setup, catalog, tables, identities' roles), then reads the catalog only.
-pub fn run(config: &Config, source: &Source) -> Result<LintReport, RunError> {
-    runner::inspect(config, source, |session, catalog, plan| {
+pub fn run(config: &Config, source: &Source, target: &Target) -> Result<LintReport, RunError> {
+    runner::inspect(config, source, target, |session, catalog, plan| {
         let mut roles: Vec<&str> = Vec::new();
         for identity in &config.identities {
             if !roles.contains(&identity.role.as_str()) {
