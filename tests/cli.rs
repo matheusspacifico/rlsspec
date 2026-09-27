@@ -7,8 +7,13 @@ struct Output {
 }
 
 fn rlsspec(args: &[&str]) -> Output {
+    rlsspec_with_env(args, &[])
+}
+
+fn rlsspec_with_env(args: &[&str], env: &[(&str, &str)]) -> Output {
     let output = Command::new(env!("CARGO_BIN_EXE_rlsspec"))
         .args(args)
+        .envs(env.iter().copied())
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .unwrap();
@@ -79,4 +84,20 @@ fn test_on_unreachable_database_is_a_connection_error() {
         out.stderr
     );
     assert!(!out.stderr.contains("postgres://"), "{}", out.stderr);
+}
+
+#[test]
+fn colour_can_be_forced_and_disabled() {
+    let args = ["test", "-c", "tests/fixtures/cli/invalid.yaml"];
+    let forced = [("CLICOLOR_FORCE", "1")];
+    let coloured = rlsspec_with_env(&args, &forced);
+    assert!(coloured.stderr.contains("\x1b["), "{:?}", coloured.stderr);
+    assert_eq!(
+        anstream::adapter::strip_str(&coloured.stderr).to_string(),
+        rlsspec(&args).stderr
+    );
+
+    let plain = rlsspec_with_env(&["--no-color", args[0], args[1], args[2]], &forced);
+    assert_eq!(plain.code, Some(2));
+    assert!(!plain.stderr.contains('\x1b'), "{:?}", plain.stderr);
 }

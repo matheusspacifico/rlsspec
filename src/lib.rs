@@ -5,3 +5,4 @@ pub mod pg;
 pub mod report;
 pub mod runner;
 pub mod safety;
+pub mod style;

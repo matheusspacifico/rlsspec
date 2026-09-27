@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use rlsspec::config::{self, ConfigError};
 use rlsspec::pg::PgError;
 use rlsspec::runner::{self, RunError};
-use rlsspec::{report, safety};
+use rlsspec::{report, safety, style};
 
 const EXIT_ERROR: u8 = 2;
 
@@ -24,6 +24,10 @@ struct Cli {
     #[arg(long, global = true)]
     allow_remote: bool,
 
+    /// Disable coloured output (also off when not a terminal or when NO_COLOR is set)
+    #[arg(long, global = true)]
+    no_color: bool,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -38,12 +42,18 @@ enum Command {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if cli.no_color {
+        anstream::ColorChoice::Never.write_global();
+    }
     match run(&cli) {
         Ok(code) => code,
         Err(err) => {
-            match located(&err) {
-                Some(invalid) => eprint!("{invalid}"),
-                None => eprintln!("error: {err:#}"),
+            match located(&err).and_then(ConfigError::styled) {
+                Some(invalid) => anstream::eprint!("{invalid}"),
+                None => {
+                    let (error, emphasis) = (style::ERROR, style::EMPHASIS);
+                    anstream::eprintln!("{error}error{error:#}{emphasis}:{emphasis:#} {err:#}");
+                }
             }
             ExitCode::from(EXIT_ERROR)
         }
@@ -68,7 +78,7 @@ fn test(cli: &Cli) -> Result<ExitCode> {
         cli.allow_remote,
     )?;
     let report = runner::run(&config, &source)?;
-    print!("{}", report::text::render(&report));
+    anstream::print!("{}", report::text::render(&report));
     Ok(ExitCode::from(report.exit_code()))
 }
 

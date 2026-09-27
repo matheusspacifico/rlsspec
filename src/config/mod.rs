@@ -135,7 +135,7 @@ pub enum ConfigError {
         #[source]
         source: io::Error,
     },
-    #[error("{}", diagnostic::render(path, text, diagnostics))]
+    #[error("{}", diagnostic::render(path, text, diagnostics, false))]
     Invalid {
         path: PathBuf,
         text: String,
@@ -166,6 +166,20 @@ impl Source {
             path: self.path.clone(),
             text: self.text.clone(),
             diagnostics,
+        }
+    }
+}
+
+impl ConfigError {
+    /// The located diagnostics with terminal styles, for `Invalid`; `None` otherwise.
+    pub fn styled(&self) -> Option<String> {
+        match self {
+            ConfigError::Invalid {
+                path,
+                text,
+                diagnostics,
+            } => Some(diagnostic::render(path, text, diagnostics, true)),
+            ConfigError::Read { .. } => None,
         }
     }
 }
