@@ -11,7 +11,7 @@ expression: "out.replace(SKIPPED_RLS007, SKIPPED_NONE)"
       "severity": "error",
       "object": "tags",
       "role": null,
-      "hint": "row level security is not enabled: every role with a grant sees every row",
+      "hint": "row level security is not enabled: app sees every row",
       "table": {
         "schema": "public",
         "name": "tags"

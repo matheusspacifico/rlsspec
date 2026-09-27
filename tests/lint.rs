@@ -59,9 +59,10 @@ fn rls001_table_without_rls() {
         split(&out),
         (
             vec![
-                "✗ RLS001  tags  row level security is not enabled: every role with a grant sees every row"
+                "✗ RLS001  tags               row level security is not enabled: app sees every row",
+                "i RLS001  schema_migrations  row level security is not enabled; no identity role has a privilege on it, but a grant would expose every row",
             ],
-            "1 error · 0 warnings · 0 info · 0 ignored"
+            "1 error · 0 warnings · 1 info · 0 ignored"
         )
     );
     assert_clean("rls001_green");

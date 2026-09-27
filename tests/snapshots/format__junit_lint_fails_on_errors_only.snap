@@ -6,7 +6,7 @@ expression: rest.to_string().unwrap()
 <testsuites name="rlsspec lint" tests="8" skipped="0" failures="1" errors="0">
     <testsuite name="RLS001" tests="1" skipped="0" errors="0" failures="1">
         <testcase name="tags" classname="RLS001">
-            <failure message="row level security is not enabled: every role with a grant sees every row">error: row level security is not enabled: every role with a grant sees every row</failure>
+            <failure message="row level security is not enabled: app sees every row">error: row level security is not enabled: app sees every row</failure>
         </testcase>
     </testsuite>
     <testsuite name="RLS002" tests="1" skipped="0" errors="0" failures="0">
