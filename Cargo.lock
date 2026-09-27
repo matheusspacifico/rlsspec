@@ -1884,6 +1884,7 @@ dependencies = [
  "postgres",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "testcontainers-modules",
  "thiserror",
 ]

@@ -2,7 +2,7 @@
 source: tests/config.rs
 expression: "errors(\"version: 1\\ndatabase: { url: postgres://localhost/db }\\nidentities:\\n  alice: { role: app, rol: x }\\n\")"
 ---
-error: unknown field `rol`, expected one of role, gucs
+error: unknown field `rol`, expected one of role, gucs, claims
  --> rlsspec.yaml:4:23
   |
 4 |   alice: { role: app, rol: x }

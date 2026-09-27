@@ -3,6 +3,7 @@ pub mod config;
 pub mod identity;
 pub mod init;
 pub mod pg;
+pub mod preset;
 pub mod report;
 pub mod runner;
 pub mod safety;

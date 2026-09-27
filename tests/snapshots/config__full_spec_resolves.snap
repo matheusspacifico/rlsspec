@@ -30,14 +30,22 @@ Config {
             name: "alice",
             role: "app",
             gucs: [
-                (
-                    "app.tenant_id",
-                    "0191e6a2-0000-7000-8000-00000000000a",
-                ),
-                (
-                    "app.name",
-                    "o'neil",
-                ),
+                Guc {
+                    name: "app.tenant_id",
+                    value: "0191e6a2-0000-7000-8000-00000000000a",
+                    span: Span {
+                        line: 15,
+                        column: 13,
+                    },
+                },
+                Guc {
+                    name: "app.name",
+                    value: "o'neil",
+                    span: Span {
+                        line: 15,
+                        column: 43,
+                    },
+                },
             ],
             span: Span {
                 line: 14,

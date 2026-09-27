@@ -1,0 +1,17 @@
+---
+source: src/preset/supabase.rs
+expression: "parse(\"preset: supabase\nidentities:\n  ana:\n    role: authenticated\n    gucs:\n      request.jwt.claim.sub: x\n      request.jwt.claims: '{}'\n      request.jwt.claim.email: kept, not a claim here\n    claims: { sub: x }\n\").unwrap_err()"
+---
+error: `request.jwt.claim.sub` is set from `claims` by the supabase preset; remove it from `gucs`
+ --> rlsspec.yaml:8:7
+  |
+8 |       request.jwt.claim.sub: x
+  |       ^
+
+error: `request.jwt.claims` is set from `claims` by the supabase preset; remove it from `gucs`
+ --> rlsspec.yaml:9:7
+  |
+9 |       request.jwt.claims: '{}'
+  |       ^
+
+error: could not load rlsspec.yaml (2 errors)

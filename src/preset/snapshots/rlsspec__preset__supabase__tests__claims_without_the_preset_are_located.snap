@@ -1,0 +1,11 @@
+---
+source: src/preset/supabase.rs
+expression: "parse(\"identities:\n  ana:\n    role: authenticated\n    claims: { sub: x }\n\").unwrap_err()"
+---
+error: `claims` needs a preset that reads them; add `preset: supabase` at the top level
+ --> rlsspec.yaml:6:13
+  |
+6 |     claims: { sub: x }
+  |             ^
+
+error: could not load rlsspec.yaml (1 error)

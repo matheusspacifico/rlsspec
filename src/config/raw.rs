@@ -15,6 +15,7 @@ pub type Value = Spanned<Option<String>>;
 #[serde(deny_unknown_fields)]
 pub struct RawConfig {
     pub version: Spanned<u32>,
+    pub preset: Option<Spanned<String>>,
     pub database: RawDatabase,
     #[serde(default)]
     pub safety: RawSafety,
@@ -53,6 +54,7 @@ pub struct RawIdentity {
     pub role: Spanned<String>,
     #[serde(default)]
     pub gucs: SpannedMap<Spanned<String>>,
+    pub claims: Option<Spanned<serde_json::Value>>,
 }
 
 #[derive(Debug, Deserialize)]

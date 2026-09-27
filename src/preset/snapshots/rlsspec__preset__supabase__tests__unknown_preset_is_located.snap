@@ -1,0 +1,11 @@
+---
+source: src/preset/supabase.rs
+expression: "parse(\"preset: firebase\\nidentities:\\n  ana: { role: app }\\n\").unwrap_err()"
+---
+error: unknown preset `firebase`; expected `supabase`
+ --> rlsspec.yaml:3:9
+  |
+3 | preset: firebase
+  |         ^
+
+error: could not load rlsspec.yaml (1 error)

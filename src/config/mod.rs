@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_saphyr::{DefaultMessageFormatter, MessageFormatter};
 
+use crate::preset;
+
 pub use diagnostic::{Diagnostic, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +56,29 @@ impl Default for Safety {
 pub struct Identity {
     pub name: String,
     pub role: String,
-    pub gucs: Vec<(String, String)>,
+    pub gucs: Vec<Guc>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Guc {
+    pub name: String,
+    pub value: String,
+    pub span: Span,
+}
+
+/// The parts of a spec only a preset understands, set aside while resolving: the top-level
+/// `preset` and the identities' `claims`. `preset::apply` turns them into plain GUCs.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Extensions {
+    pub preset: Option<(String, Span)>,
+    pub claims: Vec<Claims>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Claims {
+    pub identity: String,
+    pub value: serde_json::Value,
     pub span: Span,
 }
 
@@ -253,12 +277,17 @@ pub fn parse(
     path: &Path,
     env: &dyn Fn(&str) -> Option<String>,
 ) -> Result<Config, ConfigError> {
-    let invalid = |diagnostics| ConfigError::Invalid {
-        path: path.to_path_buf(),
-        text: text.to_owned(),
-        diagnostics,
-        stage: Stage::Load,
-    };
+    let (config, extensions) = parse_unexpanded(text, path, env)?;
+    preset::apply(config, extensions).map_err(|diagnostics| invalid(text, path, diagnostics))
+}
+
+/// The config before any preset is applied, with what only a preset understands set aside.
+pub(crate) fn parse_unexpanded(
+    text: &str,
+    path: &Path,
+    env: &dyn Fn(&str) -> Option<String>,
+) -> Result<(Config, Extensions), ConfigError> {
+    let invalid = |diagnostics| invalid(text, path, diagnostics);
     let options = serde_saphyr::options! { with_snippet: false };
     let raw = serde_saphyr::from_str_with_options(text, options).map_err(|err| {
         let message = escape_control(&DefaultMessageFormatter.format_message(&err));
@@ -272,6 +301,15 @@ pub fn parse(
     })?;
     let base = path.parent().unwrap_or(Path::new(""));
     resolve::resolve(raw, base, env).map_err(invalid)
+}
+
+fn invalid(text: &str, path: &Path, diagnostics: Vec<Diagnostic>) -> ConfigError {
+    ConfigError::Invalid {
+        path: path.to_path_buf(),
+        text: text.to_owned(),
+        diagnostics,
+        stage: Stage::Load,
+    }
 }
 
 fn escape_control(text: &str) -> String {

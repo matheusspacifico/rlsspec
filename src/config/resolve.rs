@@ -9,9 +9,10 @@ use super::raw::{
 };
 use super::vars::{self, Mode, Reference};
 use super::{
-    Assignment, Assignments, Block, Config, DEFAULT_LOCK_TIMEOUT, DEFAULT_STATEMENT_TIMEOUT,
-    Database, DeleteCase, Diagnostic, Expectation, Identity, InsertCase, Ops, Safety, Select,
-    SelectCase, Span, Spec, TableRef, UpdateCase, Writes,
+    Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
+    DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Expectation, Extensions, Guc,
+    Identity, InsertCase, Ops, Safety, Select, SelectCase, Span, Spec, TableRef, UpdateCase,
+    Writes,
 };
 
 const SUPPORTED_VERSION: u32 = 1;
@@ -22,7 +23,7 @@ pub fn resolve(
     raw: RawConfig,
     base: &Path,
     env: &dyn Fn(&str) -> Option<String>,
-) -> Result<Config, Vec<Diagnostic>> {
+) -> Result<(Config, Extensions), Vec<Diagnostic>> {
     let mut r = Resolver {
         diagnostics: Vec::new(),
         vars: HashMap::new(),
@@ -56,7 +57,11 @@ pub fn resolve(
             full
         })
         .collect();
-    let identities = r.identities(raw.identities);
+    let (identities, claims) = r.identities(raw.identities);
+    let extensions = Extensions {
+        preset: raw.preset.map(|name| (name.value.clone(), span(&name))),
+        claims,
+    };
     let known: HashSet<String> = identities.iter().map(|i| i.name.clone()).collect();
 
     let mut defaults = Vec::new();
@@ -92,7 +97,7 @@ pub fn resolve(
     }
 
     if r.diagnostics.is_empty() {
-        Ok(Config {
+        let config = Config {
             database,
             safety,
             setup,
@@ -100,7 +105,8 @@ pub fn resolve(
             unspecified: raw.unspecified,
             defaults,
             expect,
-        })
+        };
+        Ok((config, extensions))
     } else {
         r.diagnostics.sort_by_key(|d| d.span);
         Err(r.diagnostics)
@@ -219,14 +225,19 @@ impl Resolver<'_> {
         }
     }
 
-    fn identities(&mut self, raw: Spanned<SpannedMap<RawIdentity>>) -> Vec<Identity> {
+    fn identities(
+        &mut self,
+        raw: Spanned<SpannedMap<RawIdentity>>,
+    ) -> (Vec<Identity>, Vec<Claims>) {
         if raw.value.is_empty() {
             self.error(
                 span(&raw),
                 "`identities` must define at least one identity".into(),
             );
         }
-        raw.value
+        let mut claims = Vec::new();
+        let identities = raw
+            .value
             .into_iter()
             .map(|(name, identity)| {
                 if identity.role.value.trim().is_empty() {
@@ -242,10 +253,27 @@ impl Resolver<'_> {
                         if key.value.trim().is_empty() {
                             self.error(span(&key), "setting name is empty".into());
                         }
+                        let at = span(&key);
                         let value = self.substitute(&value.value, span(&value), Mode::Raw);
-                        (key.value, value.unwrap_or_default())
+                        Guc {
+                            name: key.value,
+                            value: value.unwrap_or_default(),
+                            span: at,
+                        }
                     })
                     .collect();
+                if let Some(raw) = identity.claims {
+                    let at = span(&raw);
+                    let mut value = raw.value;
+                    if let Err(message) = self.substitute_claims(&mut value) {
+                        self.error(at, message);
+                    }
+                    claims.push(Claims {
+                        identity: name.value.clone(),
+                        value,
+                        span: at,
+                    });
+                }
                 Identity {
                     name: name.value,
                     span: span(&identity.role),
@@ -253,7 +281,31 @@ impl Resolver<'_> {
                     gucs,
                 }
             })
-            .collect()
+            .collect();
+        (identities, claims)
+    }
+
+    /// `${var}` in every string of a claims tree, raw (they end up in bound parameters).
+    fn substitute_claims(&self, value: &mut serde_json::Value) -> Result<(), String> {
+        match value {
+            serde_json::Value::String(text) => {
+                *text =
+                    vars::substitute(text, Mode::Raw, |reference| self.lookup(reference, true))?;
+            }
+            serde_json::Value::Array(items) => {
+                for item in items {
+                    self.substitute_claims(item)?;
+                }
+            }
+            serde_json::Value::Object(map) => {
+                for item in map.values_mut() {
+                    self.substitute_claims(item)?;
+                }
+            }
+            serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {
+            }
+        }
+        Ok(())
     }
 
     fn check_identity(&mut self, identity: &Spanned<String>, known: &HashSet<String>) {

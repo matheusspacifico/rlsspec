@@ -1,0 +1,17 @@
+---
+source: src/preset/supabase.rs
+expression: "parse(\"preset: supabase\nidentities:\n  ana: { role: authenticated, claims: [sub, x] }\n  ben: { role: authenticated, claims: sub }\n\").unwrap_err()"
+---
+error: `claims` must be a mapping of claim names to values, e.g. `{ sub: "…" }`
+ --> rlsspec.yaml:5:39
+  |
+5 |   ana: { role: authenticated, claims: [sub, x] }
+  |                                       ^
+
+error: `claims` must be a mapping of claim names to values, e.g. `{ sub: "…" }`
+ --> rlsspec.yaml:6:39
+  |
+6 |   ben: { role: authenticated, claims: sub }
+  |                                       ^
+
+error: could not load rlsspec.yaml (2 errors)
