@@ -1,0 +1,11 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n  documents:\n    alice:\n      delete: { where: \"true\", expect: deny }\n\"#)"
+---
+error: invalid type: map, expected `allow`, `deny` or a list of cases
+ --> rlsspec.yaml:8:15
+  |
+8 |       delete: { where: "true", expect: deny }
+  |               ^
+
+error: could not load rlsspec.yaml (1 error)

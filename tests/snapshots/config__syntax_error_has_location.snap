@@ -1,0 +1,11 @@
+---
+source: tests/config.rs
+expression: "errors(\"version: 1\\ndatabase: { url: postgres://localhost/db }\\nidentities:\\n  a: [role\\n\")"
+---
+error: expected mapping start
+ --> rlsspec.yaml:4:6
+  |
+4 |   a: [role
+  |      ^
+
+error: could not load rlsspec.yaml (1 error)

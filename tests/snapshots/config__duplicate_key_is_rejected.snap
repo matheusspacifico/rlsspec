@@ -1,0 +1,11 @@
+---
+source: tests/config.rs
+expression: "errors(\"version: 1\\ndatabase: { url: postgres://localhost/db }\\nidentities:\\n  alice: { role: app }\\n  alice: { role: other }\\n\")"
+---
+error: duplicate mapping key: alice
+ --> rlsspec.yaml:5:3
+  |
+5 |   alice: { role: other }
+  |   ^
+
+error: could not load rlsspec.yaml (1 error)

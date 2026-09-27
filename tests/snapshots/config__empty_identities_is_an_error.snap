@@ -1,0 +1,11 @@
+---
+source: tests/config.rs
+expression: "errors(\"version: 1\\ndatabase: { url: postgres://localhost/db }\\nidentities: {}\\n\")"
+---
+error: `identities` must define at least one identity
+ --> rlsspec.yaml:3:13
+  |
+3 | identities: {}
+  |             ^
+
+error: could not load rlsspec.yaml (1 error)

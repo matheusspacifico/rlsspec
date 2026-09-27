@@ -1,0 +1,95 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 2\ndatabase:\n  url: ${env:MISSING_URL}\n  schemas: []\nsetup:\n  - tests/fixtures/does-not-exist.sql\nvars:\n  tenant_a: a\n  bad-name: x\n  chained: \"${tenant_a}\"\nidentities:\n  alice:\n    role: app\n    gucs: { app.tenant_id: \"${tenant_a}\", app.user_id: \"${alice_id}\" }\n  guest:\n    role: \"\"\ndefaults:\n  mallory:\n    \"*\": { select: deny }\nexpect:\n  documents:\n    alice:\n      select: { rows: \"tenant_id = ${tenant_a\" }\n      insert: []\n      update:\n        - { where: \"\", set: {}, expect: allow }\n    guest: {}\n  \"*\":\n    alice: { delete: deny }\n\"#)"
+---
+error: unsupported version 2, expected 1
+ --> rlsspec.yaml:1:10
+  |
+1 | version: 2
+  |          ^
+
+error: environment variable `MISSING_URL` is not set
+ --> rlsspec.yaml:3:8
+  |
+3 |   url: ${env:MISSING_URL}
+  |        ^
+
+error: `database.schemas` must not be empty
+ --> rlsspec.yaml:4:12
+  |
+4 |   schemas: []
+  |            ^
+
+error: setup file `tests/fixtures/does-not-exist.sql` not found next to the config file
+ --> rlsspec.yaml:6:5
+  |
+6 |   - tests/fixtures/does-not-exist.sql
+  |     ^
+
+error: invalid variable name `bad-name`
+ --> rlsspec.yaml:9:3
+  |
+9 |   bad-name: x
+  |   ^
+
+error: `vars` can only reference `${env:NAME}`, found `${tenant_a}`
+  --> rlsspec.yaml:10:12
+   |
+10 |   chained: "${tenant_a}"
+   |            ^
+
+error: undefined variable `alice_id`
+  --> rlsspec.yaml:14:56
+   |
+14 |     gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice_id}" }
+   |                                                        ^
+
+error: identity `guest` has an empty role
+  --> rlsspec.yaml:16:11
+   |
+16 |     role: ""
+   |           ^
+
+error: unknown identity `mallory`; declare it under `identities`
+  --> rlsspec.yaml:18:3
+   |
+18 |   mallory:
+   |   ^
+
+error: unterminated `${` in `tenant_id = ${tenant_a`
+  --> rlsspec.yaml:23:23
+   |
+23 |       select: { rows: "tenant_id = ${tenant_a" }
+   |                       ^
+
+error: list of cases is empty
+  --> rlsspec.yaml:24:15
+   |
+24 |       insert: []
+   |               ^
+
+error: predicate is empty
+  --> rlsspec.yaml:26:20
+   |
+26 |         - { where: "", set: {}, expect: allow }
+   |                    ^
+
+error: `set` must name at least one column
+  --> rlsspec.yaml:26:29
+   |
+26 |         - { where: "", set: {}, expect: allow }
+   |                             ^
+
+error: no operations given; expected select, insert, update or delete
+  --> rlsspec.yaml:27:5
+   |
+27 |     guest: {}
+   |     ^
+
+error: `*` is only allowed under `defaults`
+  --> rlsspec.yaml:28:3
+   |
+28 |   "*":
+   |   ^
+
+error: could not load rlsspec.yaml (15 errors)
