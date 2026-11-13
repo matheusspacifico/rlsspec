@@ -138,11 +138,11 @@ jobs:
       - uses: ./
         id: released
         with:
-          version: 0.1.0
+          version: 0.1.1
           config: examples/multitenant/rlsspec.yaml
       - run: |
           test "${{ steps.released.outputs.exit-code }}" = 0
-          "$RUNNER_TEMP"/rlsspec-v0.1.0-*/rlsspec version | grep -qx 'rlsspec 0.1.0'
+          "$RUNNER_TEMP"/rlsspec-v0.1.1-*/rlsspec version | grep -qx 'rlsspec 0.1.1'
       - run: docker compose -f examples/multitenant/docker-compose.yml exec -T db psql -q -U postgres < examples/multitenant/broken.sql
       - uses: ./
         id: red
