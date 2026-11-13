@@ -164,7 +164,7 @@ fn init_leaves_excluded_tables_out_and_writes_the_exclusion() {
         .filter_map(|l| l.split_whitespace().next())
         .filter(|name| TABLES.contains(name))
         .collect();
-    assert_eq!(tables, ["organizations", "memberships"]);
+    assert_eq!(tables, ["memberships", "organizations"]);
 
     for (names, message) in [
         (

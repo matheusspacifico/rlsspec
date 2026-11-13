@@ -31,10 +31,10 @@ identities:
 unspecified: warn
 
 expect:
-  organizations:
+  memberships:
     app_anon: { select: todo, insert: todo, update: todo, delete: todo }
     app_user: { select: todo, insert: todo, update: todo, delete: todo }
-  memberships:
+  organizations:
     app_anon: { select: todo, insert: todo, update: todo, delete: todo }
     app_user: { select: todo, insert: todo, update: todo, delete: todo }
   projects:

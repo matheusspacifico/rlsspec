@@ -69,8 +69,7 @@ SELECT c.oid, n.nspname::text, c.relname::text,
                  WHERE i.indrelid = c.oid AND i.indisprimary), '{}')
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE c.relkind IN ('r', 'p') AND n.nspname = ANY($1)
-ORDER BY 1, 2";
+WHERE c.relkind IN ('r', 'p') AND n.nspname = ANY($1)";
 
 const COLUMNS: &str = "
 SELECT a.attrelid, a.attname::text, format_type(a.atttypid, a.atttypmod), a.attgenerated <> ''
@@ -118,6 +117,9 @@ pub fn load(tx: &mut Transaction, schemas: &[String]) -> Result<Catalog, postgre
             columns: Vec::new(),
         })
         .collect();
+    // By name, then schema, compared here and not by the server's collation: the order of the
+    // reports must not depend on the order migrations ran in, nor on the database's locale.
+    tables.sort_by(|a, b| (&a.name, &a.schema).cmp(&(&b.name, &b.schema)));
     let oids: Vec<u32> = tables.iter().map(|t| t.oid).collect();
     for row in tx.query(COLUMNS, &[&oids])? {
         let oid: u32 = row.get(0);

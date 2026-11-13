@@ -3,8 +3,8 @@ source: tests/filter.rs
 expression: out.stdout
 ---
           alice
-projects  S·UD
-tasks     S·UD
 labels    ····
 plans     S·UD
+projects  S·UD
+tasks     S·UD
 coverage 9/16 cells (56.2%) · 7 unspecified (warn)

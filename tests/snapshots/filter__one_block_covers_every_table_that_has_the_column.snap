@@ -2,21 +2,21 @@
 source: tests/filter.rs
 expression: "report(\"pass\", 0)"
 ---
+labels
+  ○ alice  *  skipped (empty table)
 projects
   ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  3/3 ops
 tasks
   ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  3/3 ops
-labels
-  ○ alice  *  skipped (empty table)
 plans
   ✓ alice  *  select all, update deny, delete deny  3/3 ops
 coverage 9/16 cells (56.2%) · 7 unspecified (warn)
-projects
-  ○ alice  insert
-tasks
-  ○ alice  insert
 labels
   ○ alice  select, insert, update, delete
 plans
+  ○ alice  insert
+projects
+  ○ alice  insert
+tasks
   ○ alice  insert
 0 failed · 9 passed · 0 inconclusive · 3 skipped

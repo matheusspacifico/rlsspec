@@ -2,21 +2,21 @@
 source: tests/on_empty.rs
 expression: "run(\"skip_fail\", \"text\", 1)"
 ---
-notes
-  ✓ guest  *  deny         4/4 ops
-  ✓ alice  *  delete deny  1/1 ops
-tags
-  ✓ guest  *  deny         4/4 ops
-  ✓ alice  *  delete deny  1/1 ops
 drafts
   ✓ guest  *  deny  1/1 ops · 3 skipped (empty table)
   ○ alice  *  skipped (empty table)
+notes
+  ✓ guest  *  deny         4/4 ops
+  ✓ alice  *  delete deny  1/1 ops
+tags
+  ✓ guest  *  deny         4/4 ops
+  ✓ alice  *  delete deny  1/1 ops
 coverage 11/24 cells (45.8%) · 13 unspecified (fail)
+drafts
+  ○ alice  select, insert, update, delete
+  ○ guest  select, update, delete
 notes
   ○ alice  select, insert, update
 tags
   ○ alice  select, insert, update
-drafts
-  ○ alice  select, insert, update, delete
-  ○ guest  select, update, delete
 0 failed · 11 passed · 0 inconclusive · 4 skipped

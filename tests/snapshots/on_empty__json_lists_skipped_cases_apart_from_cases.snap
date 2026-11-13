@@ -7,118 +7,6 @@ expression: out
   "command": "test",
   "cases": [
     {
-      "table": "notes",
-      "identity": "guest",
-      "op": "select",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "permission denied",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 20
-      }
-    },
-    {
-      "table": "notes",
-      "identity": "guest",
-      "op": "insert",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "deny (no privilege)",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 34
-      }
-    },
-    {
-      "table": "notes",
-      "identity": "guest",
-      "op": "update",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "denied: no UPDATE privilege",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 48
-      }
-    },
-    {
-      "table": "notes",
-      "identity": "guest",
-      "op": "delete",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "permission denied",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 62
-      }
-    },
-    {
-      "table": "tags",
-      "identity": "guest",
-      "op": "select",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "permission denied",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 20
-      }
-    },
-    {
-      "table": "tags",
-      "identity": "guest",
-      "op": "insert",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "deny (no privilege)",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 34
-      }
-    },
-    {
-      "table": "tags",
-      "identity": "guest",
-      "op": "update",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "denied: no UPDATE privilege",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 48
-      }
-    },
-    {
-      "table": "tags",
-      "identity": "guest",
-      "op": "delete",
-      "origin": "default",
-      "description": "deny",
-      "outcome": "pass",
-      "detail": "permission denied",
-      "location": {
-        "file": "tests/fixtures/on_empty/skip_warn.yaml",
-        "line": 11,
-        "column": 62
-      }
-    },
-    {
       "table": "drafts",
       "identity": "guest",
       "op": "insert",
@@ -130,6 +18,118 @@ expression: out
         "file": "tests/fixtures/on_empty/skip_warn.yaml",
         "line": 11,
         "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 20
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 48
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 62
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 34
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 48
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 62
       }
     },
     {
@@ -222,24 +222,6 @@ expression: out
     "unspecified": 13,
     "gaps": [
       {
-        "table": "notes",
-        "identity": "alice",
-        "ops": [
-          "select",
-          "insert",
-          "update"
-        ]
-      },
-      {
-        "table": "tags",
-        "identity": "alice",
-        "ops": [
-          "select",
-          "insert",
-          "update"
-        ]
-      },
-      {
         "table": "drafts",
         "identity": "alice",
         "ops": [
@@ -256,6 +238,24 @@ expression: out
           "select",
           "update",
           "delete"
+        ]
+      },
+      {
+        "table": "notes",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update"
+        ]
+      },
+      {
+        "table": "tags",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update"
         ]
       }
     ]
