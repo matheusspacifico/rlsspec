@@ -3,6 +3,7 @@ source: tests/rows.rs
 expression: out
 ---
 notes
-  ? alice  update  set body = 'x' · rows: tenant_id = '…000a'  the statement affected 3 rows, but 4 rows of notes changed: a trigger or a cascade also changed rows of this table, so the affected rows can't be identified; use `where` cases here (tests/fixtures/rows/trigger.yaml:16:15)
+  ? alice  update  set body = 'x' · rows: tenant_id = '…000a'
+      the statement affected 3 rows, but 4 rows of notes changed: a trigger or a cascade also changed rows of this table, so the affected rows can't be identified; use `where` cases here (tests/fixtures/rows/trigger.yaml:16:15)
 coverage 1/16 cells (6.2%) · 15 unspecified (ignore)
 0 failed · 0 passed · 1 inconclusive

@@ -131,8 +131,11 @@ fn init_scaffolds_the_example_with_every_cell_todo() {
         test.stdout
     );
     assert!(
+        test.stdout.ends_with(
+            "0 failed · 0 passed · 0 inconclusive\nnothing is specified yet: replace a todo with an expectation (rlsspec cover shows the matrix)\n"
+        ),
+        "{}",
         test.stdout
-            .ends_with("0 failed · 0 passed · 0 inconclusive\n")
     );
     assert_eq!(test.stdout.matches('○').count(), 8, "{}", test.stdout);
 }

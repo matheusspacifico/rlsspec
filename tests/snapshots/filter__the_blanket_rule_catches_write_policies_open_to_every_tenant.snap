@@ -5,9 +5,11 @@ expression: out
 labels
   ○ alice  *  skipped (empty table)
 projects
-  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  3/3 ops
+  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a…  3/3 ops
 tasks
-  ✗ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  1/3 ops · update: updated 1 of the 1 row it should not update: id=3 · delete: deleted 1 of the 1 row it should not delete: id=3
+  ✗ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a…  1/3 ops
+      update: updated 1 of the 1 row it should not update: id=3
+      delete: deleted 1 of the 1 row it should not delete: id=3
 plans
   ✓ alice  *  select all, update deny, delete deny  3/3 ops
 coverage 9/16 cells (56.2%) · 7 unspecified (warn)
