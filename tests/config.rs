@@ -284,3 +284,73 @@ lint:
         "{out}"
     );
 }
+
+#[test]
+fn top_level_x_keys_are_ignored_and_hold_anchors() {
+    let config = parse(
+        r#"version: 1
+x-nobody: &nobody { select: deny, delete: deny }
+x-notes: [anything, { goes: here }, "${not_a_var}"]
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+expect:
+  notes:
+    alice: *nobody
+  tags:
+    alice: { <<: *nobody, update: deny }
+"#,
+    )
+    .unwrap();
+    assert_eq!(config.expect.len(), 2);
+    let given = |i: usize| {
+        let ops = &config.expect[i].ops;
+        [
+            ops.select.is_some(),
+            ops.insert.is_some(),
+            ops.update.is_some(),
+            ops.delete.is_some(),
+        ]
+    };
+    assert_eq!(given(0), [true, false, false, true]);
+    assert_eq!(given(1), [true, false, true, true]);
+}
+
+#[test]
+fn x_keys_are_unknown_below_the_top_level_and_other_unknown_keys_keep_their_error() {
+    let nested = errors(
+        "version: 1\ndatabase: { url: postgres://localhost/db, x-note: 1 }\nidentities:\n  alice: { role: app }\n",
+    );
+    assert!(
+        nested.starts_with(
+            "error: unknown field `x-note`, expected one of url, schemas\n --> rlsspec.yaml:2:43\n"
+        ),
+        "{nested}"
+    );
+    let top = errors(
+        "version: 1\nx-ok: 1\ndatabase: { url: postgres://localhost/db }\nxtra: 1\nidentities:\n  alice: { role: app }\n",
+    );
+    assert!(
+        top.starts_with(
+            "error: unknown field `xtra`, expected one of version, preset, database, safety, setup, vars, identities, unspecified, defaults, expect, lint\n --> rlsspec.yaml:4:1\n"
+        ),
+        "{top}"
+    );
+    let duplicate = errors(
+        "version: 1\nx-a: 1\nx-a: 2\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\n",
+    );
+    assert!(duplicate.contains("rlsspec.yaml:3:1"), "{duplicate}");
+}
+
+/// The parser's alias/anchor ratio check (100 aliases, more than 10 per anchor) is off: a spec
+/// that shares a few anchors across many tables is the document `x-*` keys invite.
+#[test]
+fn many_aliases_of_one_anchor_are_accepted() {
+    let mut yaml = String::from(
+        "version: 1\nx-deny: &deny { select: deny }\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n",
+    );
+    for i in 0..150 {
+        yaml.push_str(&format!("  t{i}:\n    alice: *deny\n"));
+    }
+    assert_eq!(parse(&yaml).unwrap().expect.len(), 150);
+}

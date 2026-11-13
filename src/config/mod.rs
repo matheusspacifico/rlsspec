@@ -307,7 +307,12 @@ pub(crate) fn parse_unexpanded(
     env: &dyn Fn(&str) -> Option<String>,
 ) -> Result<(Config, Extensions), ConfigError> {
     let invalid = |diagnostics| invalid(text, path, diagnostics);
-    let options = serde_saphyr::options! { with_snippet: false };
+    // The alias/anchor ratio check guards against alias bombs in untrusted input. A spec is the
+    // user's own file, and shared anchors under `x-*` keys easily pass 10 aliases per anchor.
+    // Every other limit of the parser stays.
+    let mut budget = serde_saphyr::budget::Budget::default();
+    budget.enforce_alias_anchor_ratio = false;
+    let options = serde_saphyr::options! { with_snippet: false, budget: Some(budget) };
     let raw = serde_saphyr::from_str_with_options(text, options).map_err(|err| {
         let message = escape_control(&DefaultMessageFormatter.format_message(&err));
         // serde-saphyr appends advice about its own Options API, which means nothing to users.

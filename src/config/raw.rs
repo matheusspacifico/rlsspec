@@ -2,8 +2,8 @@ use std::fmt;
 use std::marker::PhantomData;
 
 use serde::Deserialize;
-use serde::de::value::{MapAccessDeserializer, SeqAccessDeserializer};
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::value::{MapAccessDeserializer, SeqAccessDeserializer, StrDeserializer};
+use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_saphyr::Spanned;
 
 use super::map::SpannedMap;
@@ -11,8 +11,12 @@ use super::{Expectation, Unspecified};
 
 pub type Value = Spanned<Option<String>>;
 
+/// Top-level keys with this prefix are accepted and ignored: a home for shared YAML anchors.
+const EXTENSION_PREFIX: &str = "x-";
+
+// `remote = "Self"` makes the derive an inherent function, so the trait impl below can wrap it.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, remote = "Self")]
 pub struct RawConfig {
     pub version: Spanned<u32>,
     pub preset: Option<Spanned<String>>,
@@ -32,6 +36,53 @@ pub struct RawConfig {
     pub expect: SpannedMap<SpannedMap<RawOps>>,
     #[serde(default)]
     pub lint: RawLint,
+}
+
+impl<'de> Deserialize<'de> for RawConfig {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct ConfigVisitor;
+
+        impl<'de> Visitor<'de> for ConfigVisitor {
+            type Value = RawConfig;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a mapping")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<RawConfig, A::Error> {
+                RawConfig::deserialize(MapAccessDeserializer::new(SkipExtensions(map)))
+            }
+        }
+
+        deserializer.deserialize_map(ConfigVisitor)
+    }
+}
+
+/// The top-level mapping without its `x-*` entries, whose values are skipped unread.
+struct SkipExtensions<A>(A);
+
+impl<'de, A: MapAccess<'de>> MapAccess<'de> for SkipExtensions<A> {
+    type Error = A::Error;
+
+    fn next_key_seed<K: DeserializeSeed<'de>>(
+        &mut self,
+        seed: K,
+    ) -> Result<Option<K::Value>, A::Error> {
+        while let Some(key) = self.0.next_key::<String>()? {
+            if key.starts_with(EXTENSION_PREFIX) {
+                self.0.next_value::<IgnoredAny>()?;
+                continue;
+            }
+            return seed
+                .deserialize(StrDeserializer::<A::Error>::new(&key))
+                .map(Some);
+        }
+        Ok(None)
+    }
+
+    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, A::Error> {
+        self.0.next_value_seed(seed)
+    }
 }
 
 #[derive(Debug, Deserialize)]
