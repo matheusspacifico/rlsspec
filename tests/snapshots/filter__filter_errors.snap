@@ -1,0 +1,29 @@
+---
+source: tests/filter.rs
+expression: out.stderr
+---
+error: `*[org_id]` matches no table: no table in scope has a column `org_id`
+  --> tests/fixtures/filter/errors.yaml:13:5
+   |
+13 |     "*[org_id]": { select: deny }
+   |     ^
+
+error: `*[tenant_id, colour]` matches no table: no table in scope has the columns `tenant_id`, `colour`
+  --> tests/fixtures/filter/errors.yaml:14:5
+   |
+14 |     "*[tenant_id, colour]": { select: deny }
+   |     ^
+
+error: `*[project_id]` and `*[tenant_id]` (line 12) both match table tasks and define `select` for `alice`; give that table its own default, or make the two filters disjoint
+  --> tests/fixtures/filter/errors.yaml:15:5
+   |
+15 |     "*[project_id]": { select: all, update: deny }
+   |     ^
+
+error: `*[title]` and `*[project_id]` (line 15) both match table tasks and define `update` for `alice`; give that table its own default, or make the two filters disjoint
+  --> tests/fixtures/filter/errors.yaml:16:5
+   |
+16 |     "*[title]": { update: deny }
+   |     ^
+
+error: stopped before running any case (4 errors in tests/fixtures/filter/errors.yaml)

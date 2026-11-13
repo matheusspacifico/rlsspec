@@ -131,8 +131,29 @@ impl Unspecified {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TableRef {
+    /// `"*"`: every table in scope.
     All,
+    /// `"*[a, b]"`: every table in scope that has all of these columns.
+    Having(Vec<String>),
     Named(String),
+}
+
+impl TableRef {
+    /// Whether the block expands to the tables it matches instead of naming one.
+    pub fn is_wildcard(&self) -> bool {
+        matches!(self, TableRef::All | TableRef::Having(_))
+    }
+}
+
+impl std::fmt::Display for TableRef {
+    /// The key as written in the spec.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TableRef::All => f.write_str("*"),
+            TableRef::Having(columns) => write!(f, "*[{}]", columns.join(", ")),
+            TableRef::Named(name) => f.write_str(name),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

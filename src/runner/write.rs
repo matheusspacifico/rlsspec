@@ -156,7 +156,7 @@ pub fn modify(
     if expected == 0 {
         return Ok(Outcome::Inconclusive(match predicate {
             Some(_) => no_match(at),
-            None => empty_table(table, at, false),
+            None => empty_table(table, at, None),
         }));
     }
 

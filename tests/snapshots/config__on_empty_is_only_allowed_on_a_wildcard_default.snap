@@ -8,13 +8,13 @@ error: no operations given; expected select, insert, update or delete
 7 |     "*": { on_empty: skip }
   |     ^
 
-error: `on_empty` is only allowed on a `"*"` default; this table is named on purpose, so add rows in `setup` or write `todo`
+error: `on_empty` is only allowed on a `"*"` or `"*[column]"` default; this table is named on purpose, so add rows in `setup` or write `todo`
  --> rlsspec.yaml:8:38
   |
 8 |     notes: { select: deny, on_empty: skip }
   |                                      ^
 
-error: `on_empty` is only allowed on a `"*"` default; this table is named on purpose, so add rows in `setup` or write `todo`
+error: `on_empty` is only allowed on a `"*"` or `"*[column]"` default; this table is named on purpose, so add rows in `setup` or write `todo`
   --> rlsspec.yaml:11:38
    |
 11 |     alice: { select: deny, on_empty: inconclusive }
