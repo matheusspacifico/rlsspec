@@ -17,3 +17,6 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+    ignore:
+      # Its tags are Rust toolchain versions (the msrv job pins rust-version), not action releases.
+      - dependency-name: dtolnay/rust-toolchain
