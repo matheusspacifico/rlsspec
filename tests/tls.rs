@@ -43,12 +43,14 @@ fn server() -> Arc<Server> {
         return server;
     }
     let tag = env::var("RLSSPEC_PG_TAG").unwrap_or_else(|_| "17".into());
-    let container = Postgres::default()
-        .with_tag(tag)
-        .with_cmd(["sh", "-c", START])
-        .start()
-        .unwrap();
-    let port = container.get_host_port_ipv4(5432).unwrap();
+    let (container, port, mut admin) = common::start_ready(|| {
+        Postgres::default()
+            .with_tag(&tag)
+            .with_cmd(["sh", "-c", START])
+            .start()
+            .unwrap()
+    });
+    admin.batch_execute("CREATE ROLE app").unwrap();
     let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("tls");
     fs::create_dir_all(&dir).unwrap();
     let copy = |name: &str| {
@@ -62,11 +64,6 @@ fn server() -> Arc<Server> {
         path
     };
     let (ca, other_ca) = (copy("ca.pem"), copy("other.pem"));
-    common::connect_when_ready(&format!(
-        "postgres://postgres:postgres@127.0.0.1:{port}/postgres"
-    ))
-    .batch_execute("CREATE ROLE app")
-    .unwrap();
     let server = Arc::new(Server {
         _container: container,
         port,
