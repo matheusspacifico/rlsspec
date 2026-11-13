@@ -93,7 +93,7 @@ PS> powershell -ExecutionPolicy Bypass -c "irm https://github.com/matheusspacifi
 ```
 
 The installers put `rlsspec` in `~/.cargo/bin` (or `$CARGO_HOME/bin`) and add it to your `PATH`. To pin a
-release, replace `latest/download` with `download/v0.1.1`.
+release, replace `latest/download` with `download/v0.2.0`.
 
 **Homebrew** (macOS, Linux):
 
@@ -115,12 +115,12 @@ Then check it runs: `rlsspec version`.
 ### Docker
 
 ```console
-$ docker run --rm --network host -v "$PWD":/work -e DATABASE_URL ghcr.io/matheusspacifico/rlsspec:0.1.1 test
+$ docker run --rm --network host -v "$PWD":/work -e DATABASE_URL ghcr.io/matheusspacifico/rlsspec:0.2.0 test
 ```
 
 The image (`linux/amd64`, `linux/arm64`) is distroless with the static binary as its entrypoint, runs as a
 non-root user and works in `/work`: mount the directory holding `rlsspec.yaml` and its `setup` files there
-(readable by any user). Tags: `0.1.1`, …, and `latest`.
+(readable by any user). Tags: `0.2.0`, …, and `latest`.
 
 The [safety guard](#safety) sees hosts from inside the container:
 
@@ -133,7 +133,7 @@ The [safety guard](#safety) sees hosts from inside the container:
   ```console
   $ docker run --rm -v "$PWD":/work \
       -e DATABASE_URL=postgres://postgres:postgres@host.docker.internal:54329/postgres \
-      ghcr.io/matheusspacifico/rlsspec:0.1.1 lint --allow-remote --allow-insecure
+      ghcr.io/matheusspacifico/rlsspec:0.2.0 lint --allow-remote --allow-insecure
   warning: connecting to non-local host `host.docker.internal` (--allow-remote)
   warning: connecting to non-local host `host.docker.internal` without TLS if it doesn't offer it (sslmode=prefer, --allow-insecure)
   0 errors · 0 warnings · 0 info · 0 ignored
@@ -164,7 +164,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: psql "$DATABASE_URL" -f db/schema.sql -f db/policies.sql   # your migrations
-      - uses: matheusspacifico/rlsspec@v0.1.1
+      - uses: matheusspacifico/rlsspec@v0.2.0
         with:
           format: junit
           output: rlsspec.xml
@@ -176,7 +176,7 @@ jobs:
 
 | Input | Default | |
 |---|---|---|
-| `version` | the action's tag | Release to run (`0.1.1`). Required when you pin the action to a commit SHA |
+| `version` | the action's tag | Release to run (`0.2.0`). Required when you pin the action to a commit SHA |
 | `command` | `test` | `test`, `lint` or `cover` |
 | `config` | `rlsspec.yaml` | Spec file |
 | `format` | `text` | `text`, `json` or `junit` |
