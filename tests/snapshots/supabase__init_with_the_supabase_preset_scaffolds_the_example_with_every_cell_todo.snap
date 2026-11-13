@@ -36,9 +36,9 @@ expect:
   lists:
     anon: { select: todo, insert: todo, update: todo, delete: todo }
     authenticated: { select: todo, insert: todo, update: todo, delete: todo }
-  todos:
+  shares:
     anon: { select: todo, insert: todo, update: todo, delete: todo }
     authenticated: { select: todo, insert: todo, update: todo, delete: todo }
-  shares:
+  todos:
     anon: { select: todo, insert: todo, update: todo, delete: todo }
     authenticated: { select: todo, insert: todo, update: todo, delete: todo }
