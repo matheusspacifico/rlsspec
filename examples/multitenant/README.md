@@ -10,6 +10,7 @@ organization's data. It's fully specified: every identity × table × operation 
 | [`policies.sql`](policies.sql) | Row Level Security policies, driven by the `app.org_id` and `app.user_id` settings |
 | [`seed.sql`](seed.sql) | Fixture rows: organizations Acme and Globex, users ana, ben and cleo |
 | [`rlsspec.yaml`](rlsspec.yaml) | The intended access, per identity and table |
+| [`rlsspec-0.1.yaml`](rlsspec-0.1.yaml) | The same spec in 0.1 syntax, which CI runs with the latest released binary |
 | [`broken.sql`](broken.sql) | A plausible mistake in one policy, to see a failure |
 
 The rules:
@@ -28,11 +29,11 @@ $ export DATABASE_URL=postgres://postgres:postgres@localhost:54329/postgres
 $ rlsspec test
 ...
 coverage 64/64 cells (100.0%) · 0 unspecified (warn)
-0 failed · 89 passed · 0 inconclusive
+0 failed · 76 passed · 0 inconclusive
 $ rlsspec cover
                anon  ana   ben   cleo
-organizations  SIUD  SIUD  SIUD  SIUD
 memberships    SIUD  SIUD  SIUD  SIUD
+organizations  SIUD  SIUD  SIUD  SIUD
 projects       SIUD  SIUD  SIUD  SIUD
 tasks          SIUD  SIUD  SIUD  SIUD
 coverage 64/64 cells (100.0%) · 0 unspecified (warn)
@@ -53,9 +54,10 @@ $ docker compose exec -T db psql -U postgres < broken.sql
 $ rlsspec test
 ...
 tasks
-  ✗ ben   delete  where org_id = '…ac3e' and created_by <> '…0b0b' → deny                                        affected 2 of 2 rows (expected 0)
+  ✗ ben   delete  rows: created_by = '…0b0b'
+      deleted 2 of the 4 rows it should not delete: id=…0001, id=…0003
 coverage 64/64 cells (100.0%) · 0 unspecified (warn)
-1 failed · 88 passed · 0 inconclusive
+1 failed · 75 passed · 0 inconclusive
 ```
 
 The broken delete policy forgot the "own tasks, or admin" condition, so ben can delete ana's tasks.

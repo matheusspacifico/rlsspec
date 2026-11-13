@@ -133,13 +133,15 @@ jobs:
           config: examples/multitenant/rlsspec.yaml
       - run: |
           test "${{ steps.green.outputs.exit-code }}" = 0
-          grep -q '<testsuites name="rlsspec test" tests="89"' reports/rlsspec.xml
+          grep -q '<testsuites name="rlsspec test" tests="76"' reports/rlsspec.xml
       # The download path: a published release, its archive checked against the release's .sha256.
+      # rlsspec.yaml uses forms added after 0.1.1, which that binary rejects as unknown keys: until
+      # 0.2.0 is released this step runs the same spec frozen at 0.1 syntax.
       - uses: ./
         id: released
         with:
           version: 0.1.1
-          config: examples/multitenant/rlsspec.yaml
+          config: examples/multitenant/rlsspec-0.1.yaml
       - run: |
           test "${{ steps.released.outputs.exit-code }}" = 0
           "$RUNNER_TEMP"/rlsspec-v0.1.1-*/rlsspec version | grep -qx 'rlsspec 0.1.1'
