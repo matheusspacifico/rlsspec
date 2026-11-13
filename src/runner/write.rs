@@ -1,7 +1,7 @@
 use postgres::Transaction;
 use postgres::types::ToSql;
 
-use super::{Location, Outcome, RunError};
+use super::{Location, Outcome, RunError, empty_table, no_match};
 use crate::catalog::{self, Table};
 use crate::config::vars::quote_literal;
 use crate::config::{Assignment, Expectation, Identity, InsertCase};
@@ -155,13 +155,8 @@ pub fn modify(
     };
     if expected == 0 {
         return Ok(Outcome::Inconclusive(match predicate {
-            Some(_) => {
-                format!("vacuous: the predicate matches no rows, so this check cannot fail ({at})")
-            }
-            None => format!(
-                "vacuous: {} has no rows, so this check cannot fail; add rows in setup ({at})",
-                table.sql_name()
-            ),
+            Some(_) => no_match(at),
+            None => empty_table(table, at, false),
         }));
     }
 

@@ -20,7 +20,7 @@ fn non_success(kind: NonSuccessKind, message: &str, description: String) -> Test
     status
 }
 
-/// One suite per table, one test case per case (never folded); under `unspecified: fail`, a
+/// One suite per table, one test case per case (never folded), skipped ones included; under `unspecified: fail`, a
 /// `coverage` suite with a failing test case per table × identity that has gaps.
 pub fn render(report: &Report) -> Result<String, SerializeError> {
     let mut junit = Junit::new("rlsspec test");
@@ -44,6 +44,11 @@ pub fn render(report: &Report) -> Result<String, SerializeError> {
             Outcome::Fail(detail) => non_success(NonSuccessKind::Failure, detail, located(detail)),
             Outcome::Inconclusive(detail) => {
                 non_success(NonSuccessKind::Error, detail, located(detail))
+            }
+            Outcome::Skipped(reason) => {
+                let mut status = TestCaseStatus::skipped();
+                status.set_message(reason.text());
+                status
             }
         };
         let name = format!(

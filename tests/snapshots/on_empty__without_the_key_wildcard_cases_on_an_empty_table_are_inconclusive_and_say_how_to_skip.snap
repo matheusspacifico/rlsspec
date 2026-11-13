@@ -1,0 +1,21 @@
+---
+source: tests/on_empty.rs
+expression: out
+---
+notes
+  ✓ guest  *  deny         4/4 ops
+  ✓ alice  *  delete deny  1/1 ops
+tags
+  ✓ guest  *  deny         4/4 ops
+  ✓ alice  *  delete deny  1/1 ops
+drafts
+  ? guest  *  deny         1/4 ops · select: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:20) · update: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:48) · delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:62)
+  ? alice  *  delete deny  0/1 ops · delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:13:20)
+coverage 15/24 cells (62.5%) · 9 unspecified (warn)
+notes
+  ○ alice  select, insert, update
+tags
+  ○ alice  select, insert, update
+drafts
+  ○ alice  select, insert, update
+0 failed · 11 passed · 4 inconclusive

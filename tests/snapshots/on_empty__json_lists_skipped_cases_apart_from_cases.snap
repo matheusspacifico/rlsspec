@@ -1,0 +1,270 @@
+---
+source: tests/on_empty.rs
+expression: out
+---
+{
+  "schema_version": 1,
+  "command": "test",
+  "cases": [
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 20
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 48
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 62
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 34
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "denied: no UPDATE privilege",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 48
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 62
+      }
+    },
+    {
+      "table": "drafts",
+      "identity": "guest",
+      "op": "insert",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "deny (no privilege)",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 34
+      }
+    },
+    {
+      "table": "notes",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "affected 0 of 6 rows",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 13,
+        "column": 20
+      }
+    },
+    {
+      "table": "tags",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "outcome": "pass",
+      "detail": "permission denied",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 13,
+        "column": 20
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "table": "drafts",
+      "identity": "guest",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "reason": "empty_table",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 20
+      }
+    },
+    {
+      "table": "drafts",
+      "identity": "guest",
+      "op": "update",
+      "origin": "default",
+      "description": "deny",
+      "reason": "empty_table",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 48
+      }
+    },
+    {
+      "table": "drafts",
+      "identity": "guest",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "reason": "empty_table",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 11,
+        "column": 62
+      }
+    },
+    {
+      "table": "drafts",
+      "identity": "alice",
+      "op": "delete",
+      "origin": "default",
+      "description": "deny",
+      "reason": "empty_table",
+      "location": {
+        "file": "tests/fixtures/on_empty/skip_warn.yaml",
+        "line": 13,
+        "column": 20
+      }
+    }
+  ],
+  "coverage": {
+    "policy": "warn",
+    "total": 24,
+    "specified": 11,
+    "unspecified": 13,
+    "gaps": [
+      {
+        "table": "notes",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update"
+        ]
+      },
+      {
+        "table": "tags",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update"
+        ]
+      },
+      {
+        "table": "drafts",
+        "identity": "alice",
+        "ops": [
+          "select",
+          "insert",
+          "update",
+          "delete"
+        ]
+      },
+      {
+        "table": "drafts",
+        "identity": "guest",
+        "ops": [
+          "select",
+          "update",
+          "delete"
+        ]
+      }
+    ]
+  },
+  "totals": {
+    "passed": 11,
+    "failed": 0,
+    "inconclusive": 0,
+    "skipped": 4
+  },
+  "exit_code": 0
+}

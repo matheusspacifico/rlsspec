@@ -1,0 +1,13 @@
+# The same defaults with `on_empty: skip`: the cases on drafts are not run and their cells are unspecified.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql, ../writes/empty.sql]
+identities:
+  alice: { role: app, gucs: { app.tenant_id: 00000000-0000-4000-8000-00000000000a } }
+  guest: { role: web_anon }
+unspecified: warn
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny, on_empty: skip }
+  alice:
+    "*": { delete: deny, on_empty: skip }

@@ -383,3 +383,48 @@ fn database_exclude_takes_names_not_patterns() {
         "{out}"
     );
 }
+
+#[test]
+fn on_empty_is_only_allowed_on_a_wildcard_default() {
+    let config = parse(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+  bob: { role: app }
+defaults:
+  alice:
+    "*": { select: deny, on_empty: skip }
+  bob:
+    "*": { select: deny, on_empty: inconclusive }
+"#,
+    )
+    .unwrap();
+    let on_empty: Vec<_> = config.defaults.iter().map(|b| b.on_empty).collect();
+    assert_eq!(
+        on_empty,
+        [config::OnEmpty::Skip, config::OnEmpty::Inconclusive]
+    );
+
+    insta::assert_snapshot!(errors(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { on_empty: skip }
+    notes: { select: deny, on_empty: skip }
+expect:
+  tags:
+    alice: { select: deny, on_empty: inconclusive }
+"#
+    ));
+    let out = errors(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\ndefaults:\n  alice:\n    \"*\": { select: deny, on_empty: ignore }\n",
+    );
+    assert!(
+        out.contains("unknown variant `ignore`, expected one of inconclusive, skip"),
+        "{out}"
+    );
+}

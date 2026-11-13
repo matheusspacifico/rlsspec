@@ -141,7 +141,20 @@ pub struct Block {
     pub table_span: Span,
     pub identity: String,
     pub ops: Ops,
+    /// Only a wildcard default can say `skip`; everywhere else it is `Inconclusive`.
+    pub on_empty: OnEmpty,
     pub span: Span,
+}
+
+/// What the select, update and delete cases of a wildcard default are on a table with no rows.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OnEmpty {
+    /// They can't fail, so they are inconclusive (exit 2).
+    #[default]
+    Inconclusive,
+    /// They are not run, and their cells count as unspecified.
+    Skip,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
