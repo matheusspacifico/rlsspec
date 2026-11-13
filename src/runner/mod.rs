@@ -1,6 +1,7 @@
 pub mod coverage;
 mod insert_deny;
 pub(crate) mod plan;
+mod rows;
 mod select;
 mod write;
 

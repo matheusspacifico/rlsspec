@@ -1,0 +1,16 @@
+# Rows of different partitions share a `ctid`: they are told apart by (tableoid, ctid).
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [partitioned.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}" } }
+unspecified: ignore
+expect:
+  events:
+    alice:
+      select: { rows: "tenant_id = ${tenant_a}" }
+  readings:
+    alice:
+      select: { rows: "tenant_id = ${tenant_a}" }
