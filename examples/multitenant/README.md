@@ -10,7 +10,6 @@ organization's data. It's fully specified: every identity × table × operation 
 | [`policies.sql`](policies.sql) | Row Level Security policies, driven by the `app.org_id` and `app.user_id` settings |
 | [`seed.sql`](seed.sql) | Fixture rows: organizations Acme and Globex, users ana, ben and cleo |
 | [`rlsspec.yaml`](rlsspec.yaml) | The intended access, per identity and table |
-| [`rlsspec-0.1.yaml`](rlsspec-0.1.yaml) | The same spec in 0.1 syntax, which CI runs with the latest released binary |
 | [`broken.sql`](broken.sql) | A plausible mistake in one policy, to see a failure |
 
 The rules:
