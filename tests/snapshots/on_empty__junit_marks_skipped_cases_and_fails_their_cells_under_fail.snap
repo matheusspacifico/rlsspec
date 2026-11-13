@@ -4,20 +4,6 @@ expression: out
 ---
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="rlsspec test" tests="19" skipped="4" failures="4" errors="0">
-    <testsuite name="notes" tests="5" skipped="0" errors="0" failures="0">
-        <testcase name="guest select deny" classname="notes"/>
-        <testcase name="guest insert deny" classname="notes"/>
-        <testcase name="guest update deny" classname="notes"/>
-        <testcase name="guest delete deny" classname="notes"/>
-        <testcase name="alice delete deny" classname="notes"/>
-    </testsuite>
-    <testsuite name="tags" tests="5" skipped="0" errors="0" failures="0">
-        <testcase name="guest select deny" classname="tags"/>
-        <testcase name="guest insert deny" classname="tags"/>
-        <testcase name="guest update deny" classname="tags"/>
-        <testcase name="guest delete deny" classname="tags"/>
-        <testcase name="alice delete deny" classname="tags"/>
-    </testsuite>
     <testsuite name="drafts" tests="5" skipped="4" errors="0" failures="0">
         <testcase name="guest select deny" classname="drafts">
             <skipped message="empty table"/>
@@ -33,18 +19,32 @@ expression: out
             <skipped message="empty table"/>
         </testcase>
     </testsuite>
+    <testsuite name="notes" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="guest select deny" classname="notes"/>
+        <testcase name="guest insert deny" classname="notes"/>
+        <testcase name="guest update deny" classname="notes"/>
+        <testcase name="guest delete deny" classname="notes"/>
+        <testcase name="alice delete deny" classname="notes"/>
+    </testsuite>
+    <testsuite name="tags" tests="5" skipped="0" errors="0" failures="0">
+        <testcase name="guest select deny" classname="tags"/>
+        <testcase name="guest insert deny" classname="tags"/>
+        <testcase name="guest update deny" classname="tags"/>
+        <testcase name="guest delete deny" classname="tags"/>
+        <testcase name="alice delete deny" classname="tags"/>
+    </testsuite>
     <testsuite name="coverage" tests="4" skipped="0" errors="0" failures="4">
-        <testcase name="alice coverage" classname="notes">
-            <failure message="unspecified: select, insert, update">unspecified: select, insert, update (unspecified: fail)</failure>
-        </testcase>
-        <testcase name="alice coverage" classname="tags">
-            <failure message="unspecified: select, insert, update">unspecified: select, insert, update (unspecified: fail)</failure>
-        </testcase>
         <testcase name="alice coverage" classname="drafts">
             <failure message="unspecified: select, insert, update, delete">unspecified: select, insert, update, delete (unspecified: fail)</failure>
         </testcase>
         <testcase name="guest coverage" classname="drafts">
             <failure message="unspecified: select, update, delete">unspecified: select, update, delete (unspecified: fail)</failure>
+        </testcase>
+        <testcase name="alice coverage" classname="notes">
+            <failure message="unspecified: select, insert, update">unspecified: select, insert, update (unspecified: fail)</failure>
+        </testcase>
+        <testcase name="alice coverage" classname="tags">
+            <failure message="unspecified: select, insert, update">unspecified: select, insert, update (unspecified: fail)</failure>
         </testcase>
     </testsuite>
 </testsuites>

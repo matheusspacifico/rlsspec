@@ -2,21 +2,21 @@
 source: tests/on_empty.rs
 expression: "run(\"skip_leak\", \"text\", 1)"
 ---
+drafts
+  ✓ guest  *  deny  1/1 ops · 3 skipped (empty table)
+  ○ alice  *  skipped (empty table)
 notes
   ✗ guest  *  deny         2/4 ops · select: leaked 6 of the 6 rows it should not see: id=1, id=2, id=3, id=4, id=5, … · update: affected 6 of 6 rows (expected 0)
   ✓ alice  *  delete deny  1/1 ops
 tags
   ✓ guest  *  deny         4/4 ops
   ✓ alice  *  delete deny  1/1 ops
-drafts
-  ✓ guest  *  deny  1/1 ops · 3 skipped (empty table)
-  ○ alice  *  skipped (empty table)
 coverage 11/24 cells (45.8%) · 13 unspecified (warn)
+drafts
+  ○ alice  select, insert, update, delete
+  ○ guest  select, update, delete
 notes
   ○ alice  select, insert, update
 tags
   ○ alice  select, insert, update
-drafts
-  ○ alice  select, insert, update, delete
-  ○ guest  select, update, delete
 2 failed · 9 passed · 0 inconclusive · 4 skipped

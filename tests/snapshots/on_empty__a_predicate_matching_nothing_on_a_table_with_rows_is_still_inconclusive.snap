@@ -2,21 +2,21 @@
 source: tests/on_empty.rs
 expression: "run(\"no_match\", \"text\", 2)"
 ---
-notes
-  ✓ guest  *  deny                        4/4 ops
-  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
-tags
-  ✓ guest  *  deny                        4/4 ops
-  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
 drafts
   ✓ guest  *  deny  1/1 ops · 3 skipped (empty table)
   ○ alice  *  skipped (empty table)
+notes
+  ✓ guest  *  deny                        4/4 ops
+  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
+tags
+  ✓ guest  *  deny                        4/4 ops
+  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
 coverage 11/24 cells (45.8%) · 13 unspecified (warn)
+drafts
+  ○ alice  select, insert, update, delete
+  ○ guest  select, update, delete
 notes
   ○ alice  select, insert, delete
 tags
   ○ alice  select, insert, delete
-drafts
-  ○ alice  select, insert, update, delete
-  ○ guest  select, update, delete
 0 failed · 9 passed · 2 inconclusive · 4 skipped
