@@ -14,8 +14,10 @@ codes they share.
   terminal say.
 - The format never changes the **exit code**.
 - **Config, connection and run errors** (a bad spec, an unreachable database) are the same in every format:
-  plain text on stderr, **nothing on stdout**, exit 2. There is no JSON error document in v0.1, so a CI step
+  plain text on stderr, **nothing on stdout**, exit 2. There is no JSON error document yet, so a CI step
   that saves stdout to a file gets an empty file in that case.
+- The **text** report is for people and changes freely between releases: it cuts descriptions at 64
+  characters, shortens UUIDs and puts a long result on the line below its case. Parse JSON or JUnit, never text.
 
 ```console
 $ rlsspec test --format junit > rlsspec.xml
@@ -32,9 +34,14 @@ $ rlsspec lint --format json > lint.json
 
 When a run has both failures and inconclusive cases, `2` wins. Lint warnings and info findings never fail.
 A case is *inconclusive* when it couldn't give a verdict: a check that can't fail (an empty table, a predicate
-matching no row), an SQL error other than a permission error on the target table (a NOT NULL or foreign key
-violation, a timeout, a permission error raised by a trigger or function, such as an audit trigger's own
-insert), or a case of a kind this version can't run yet.
+matching no row, or every row for a `rows` write case with `subset`), an SQL error other than a permission
+error on the target table (a NOT NULL or foreign key violation, a timeout, a permission error raised by a
+trigger or function, such as an audit trigger's own insert), a `rows` write case where a trigger or a cascade
+changed other rows of the same table, or a case of a kind this version can't run yet.
+
+A case *skipped* by `on_empty: skip` (a wildcard default on a table with no rows) is none of the above: it
+was not run, so it doesn't change the exit code by itself. Its cell counts as unspecified, which is exit 1
+under `unspecified: fail`.
 
 ## JSON
 
@@ -43,7 +50,8 @@ One pretty-printed document per run. `schema_version` comes first, then `command
 
 ### Stability: `schema_version`
 
-**rlsspec 0.1.0 freezes `schema_version: 1`.** Every field below is stable:
+**rlsspec 0.1.0 freezes `schema_version: 1`.** Every field below is stable. Fields added since are marked
+with the release that added them; they are always present from that release on:
 
 - A **breaking change** bumps `schema_version`: a field removed, renamed or retyped, or a value whose meaning
   changes.
@@ -54,6 +62,11 @@ One pretty-printed document per run. `schema_version` comes first, then `command
 
 `location.file` and `stale_ignore.file` are the spec file path exactly as given with `-c` (default
 `rlsspec.yaml`), so they resolve from the working directory rlsspec ran in.
+
+**Order.** Arrays are in report order, which is stable for a given spec and database but not part of the
+schema. Cases written under `expect` come in the spec's order; cases a wildcard default expands to, `cover`'s
+`tables`, `coverage.gaps` and the JUnit suites follow the tables **by name, then schema** (since 0.2.0; before,
+in the order the tables were created). Match on `table`, `identity` and `op`, not on position.
 
 ### `test`
 
@@ -73,33 +86,49 @@ One pretty-printed document per run. `schema_version` comes first, then `command
       "location": { "file": "rlsspec.yaml", "line": 39, "column": 30 }
     }
   ],
+  "skipped": [
+    {
+      "table": "drafts",
+      "identity": "anon",
+      "op": "select",
+      "origin": "default",
+      "description": "deny",
+      "reason": "empty_table",
+      "location": { "file": "rlsspec.yaml", "line": 34, "column": 20 }
+    }
+  ],
   "coverage": {
     "policy": "fail",
-    "total": 64,
-    "specified": 62,
-    "unspecified": 2,
-    "gaps": [{ "table": "tasks", "identity": "cleo", "ops": ["insert", "update"] }]
+    "total": 80,
+    "specified": 75,
+    "unspecified": 5,
+    "gaps": [
+      { "table": "drafts", "identity": "anon", "ops": ["select", "update", "delete"] },
+      { "table": "tasks", "identity": "cleo", "ops": ["insert", "update"] }
+    ]
   },
-  "totals": { "passed": 89, "failed": 0, "inconclusive": 0 },
+  "totals": { "passed": 76, "failed": 0, "inconclusive": 0, "skipped": 3 },
   "exit_code": 1
 }
 ```
 
 | Field | Type | Meaning |
 |---|---|---|
-| `cases` | array | Every case in run order, **never folded** (the text report folds `defaults` into one line per identity × table; JSON doesn't) |
+| `cases` | array | Every case that ran, in run order, **never folded** (the text report folds `defaults` into one line per identity × table; JSON doesn't) |
 | `cases[].table` | string | The table as displayed: `name`, or `schema.name` when the name alone is ambiguous |
 | `cases[].identity` | string | Identity name from the spec |
 | `cases[].op` | string | `select`, `insert`, `update` or `delete` |
 | `cases[].origin` | string | `expect` or `default` |
-| `cases[].description` | string | What the case checks, literals in full (`rows: …`, `where … → deny`, `deny`) |
-| `cases[].outcome` | string | `pass`, `fail` or `inconclusive` |
-| `cases[].detail` | string | The result (`12 visible`, `leaked 2 of the 4 rows it should not see: id=5, id=6`, `affected 3 of 3 rows (expected 0)`, the SQL error) |
+| `cases[].description` | string | What the case checks, literals in full (`rows: …`, `where … → deny`, `set body = 'x' · rows: …`, `deny`) |
+| `cases[].outcome` | string | `pass`, `fail` or `inconclusive`. Closed: a skipped case is listed in `skipped`, never here |
+| `cases[].detail` | string | The result (`12 visible`, `leaked 2 of the 4 rows it should not see: id=5, id=6`, `affected 3 of 3 rows (expected 0)`, `updated 1 of the 3 rows it should not update: id=4`, the SQL error) |
 | `cases[].location` | object | `{file, line, column}` of the YAML node the case comes from. For `defaults`, the default's entry, shared by every table it expands to. Every case has one |
+| `skipped` | array | *Since 0.2.0.* The cases that were not run, in run order; `[]` when there are none. Each has the `table`, `identity`, `op`, `origin`, `description` and `location` of a case, and a `reason` |
+| `skipped[].reason` | string | `empty_table`: a wildcard default with `on_empty: skip`, on a table with no rows (open: new reasons add values) |
 | `coverage.policy` | string | `ignore`, `warn` or `fail` (the spec's `unspecified`) |
 | `coverage.total`, `.specified`, `.unspecified` | integer | Cells (identity × table × operation) |
-| `coverage.gaps` | array | One `{table, identity, ops}` per table × identity with unspecified operations, whatever the policy. `todo` cells are gaps |
-| `totals` | object | `passed`, `failed`, `inconclusive`: counts of cases |
+| `coverage.gaps` | array | One `{table, identity, ops}` per table × identity with unspecified operations, whatever the policy. `todo` cells are gaps, and so are the cells of skipped cases |
+| `totals` | object | `passed`, `failed`, `inconclusive`: counts of `cases`; `skipped` (*since 0.2.0*): the length of `skipped` |
 | `exit_code` | integer | The process exit code |
 
 ### `cover`
@@ -190,10 +219,12 @@ durations, so the same run gives the same file. **The verdict always matches the
 | passing test case | A passing case |
 | `<failure message>` | A failing case. `message` is the detail; the body adds `at file:line:column` |
 | `<error message>` | An inconclusive case, same message and location |
+| `<skipped message>` | *Since 0.2.0.* A case skipped by `on_empty: skip`; the message is the reason (`empty table`). It counts in `skipped`, not in `failures` or `errors` |
 | `<testsuite name="coverage">` | Only under `unspecified: fail` with gaps: one failing test case per table × identity with gaps (`name` = `identity coverage`, `classname` = the table, message `unspecified: insert, update`) |
 
 Every case is its own test case (never folded). Under `unspecified: warn` or `ignore` there is no coverage
-suite: gaps don't fail the run there, so they aren't tests.
+suite: gaps don't fail the run there, so they aren't tests. Under `fail`, the cells of skipped cases fail
+there like any other gap, so the verdict still matches the exit code.
 
 ```xml
 <testsuites name="rlsspec test" tests="3" skipped="0" failures="1" errors="1">

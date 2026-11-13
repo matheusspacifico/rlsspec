@@ -32,8 +32,7 @@ expect:
       insert:
         - { values: { tenant_id: "${tenant_a}", title: "ok" }, expect: allow }
         - { values: { tenant_id: "${tenant_b}", title: "x" },  expect: deny }
-      update:
-        - { where: "tenant_id = ${tenant_b}", expect: deny }
+      update: { set: { title: "x" }, rows: "tenant_id = ${tenant_a}" }   # edits exactly her tenant's rows
       delete: deny
 ```
 
@@ -43,7 +42,8 @@ documents
   ✓ alice  select  rows: tenant_id = '…000a'                           12 visible
   ✓ alice  insert  values (tenant_id = '…000a', title = 'ok') → allow  inserted
   ✓ alice  insert  values (tenant_id = '…000b', title = 'x') → deny    permission denied
-  ✗ alice  update  where tenant_id = '…000b' → deny                    affected 3 of 3 rows (expected 0)
+  ✗ alice  update  set title = 'x' · rows: tenant_id = '…000a'
+      updated 3 of the 9 rows it should not update: id=13, id=14, id=15
   ✓ alice  delete  deny                                                permission denied
   ✓ guest  *       deny                                                4/4 ops
 coverage 8/8 cells (100.0%) · 0 unspecified (warn)
@@ -53,17 +53,19 @@ coverage 8/8 cells (100.0%) · 0 unspecified (warn)
 ## Features
 
 - **Intent-based checks** for `SELECT`, `INSERT`, `UPDATE` and `DELETE`, run as each identity against a real
-  database. Reports rows that *leaked*, rows that were wrongly *hidden*, and partial writes
-  (`affected 2 of 3 rows`).
+  database. Reports rows that *leaked*, rows that were wrongly *hidden*, rows a write touched that it should
+  not have (`updated 3 of the 9 rows it should not update`), and partial writes (`affected 2 of 3 rows`).
 - **Safe by construction**: everything runs in one transaction that is always rolled back; remote hosts are
   refused unless explicitly allowed.
 - **No false passes**: a check that can't fail (empty table, predicate matching nothing) is an error, and only a
   permission error on the table itself or zero affected rows counts as "denied": a write rejected by something
   else, such as an audit trigger's own insert, is inconclusive.
-- **Defaults**: `"*": { select: deny, … }` for an identity, overridden per table.
+- **Defaults**: `"*": { select: deny, … }` for an identity, overridden per table; `"*[tenant_id]"` for every
+  table that has a column, so "never touch another tenant" is written once.
 - **Coverage** of identities × tables × operations after every run, with `unspecified: fail` to break CI when
   a new table has no spec; `rlsspec cover` prints the matrix without running anything.
-- **`rlsspec init`** scaffolds a spec from the database, every cell marked `todo`.
+- **`rlsspec init`** scaffolds a spec from the database, every cell marked `todo`; `database.exclude` keeps
+  migration bookkeeping tables out of scope.
 - **Vendor-neutral**: an identity is a Postgres role + session settings (GUCs), so it fits any RLS design.
 - A **`supabase` preset**: give an identity JWT `claims` and `auth.uid()`, `auth.role()` and `auth.jwt()` just
   work (see [Supabase](#supabase)).
@@ -218,8 +220,8 @@ $ rlsspec test
 
 Start from your database: `rlsspec init` writes `rlsspec.yaml` with one identity per role that has privileges
 on your tables and every identity × table × operation marked `todo` (it reads `DATABASE_URL`; `--schemas`,
-`-o` and `--force` change what it reads and writes). Or write it by hand (`-c path/to/spec.yaml` to use
-another path):
+`--exclude`, `-o` and `--force` change what it reads and writes). Or write it by hand (`-c path/to/spec.yaml`
+to use another path):
 
 ```yaml
 version: 1
@@ -227,6 +229,7 @@ version: 1
 database:
   url: ${env:DATABASE_URL}        # read from the environment
   schemas: [public]               # tables in scope
+  exclude: [schema_migrations]    # optional: tables left out (no case, no coverage cell, no table lint rule)
 
 setup:                            # optional SQL files run first, as the privileged role (rolled back)
   - fixtures.sql
@@ -247,6 +250,9 @@ expect:                           # table → identity → operations
 Then run `rlsspec test`. The rows your checks need must exist: put them in the database beforehand or in
 `setup` files (a check against an empty table is reported as an error, never a pass).
 
+Top-level keys starting with `x-` are ignored, whatever they hold: a place for YAML anchors shared across
+the spec (`x-own: &own { rows: "tenant_id = ${tenant_a}" }`, then `select: *own`).
+
 **`version: 1` is stable.** From v0.1.0, a spec that runs on this release keeps running, with the same
 meaning, on later releases. New features only add optional keys; an older rlsspec rejects keys it doesn't
 know, so upgrade before using them. A change that would break a spec or change what it checks would come
@@ -260,24 +266,76 @@ gain rules, so `rlsspec lint` can report findings it didn't before.
 | `select: { rows: "<sql>" }` | it sees exactly the rows where the predicate holds (`subset: true`: at most those) |
 | `insert: [{ values: {…}, expect: allow\|deny }]` | the row is inserted / rejected with a permission error |
 | `insert: deny` | the catalog proves no insert can succeed (no privilege, or no permissive policy applies; one whose check is `false` doesn't count) |
+| `update: { set: {…}, rows: "<sql>" }` | an `UPDATE` of the whole table with those constants changes exactly the rows where the predicate holds (`subset: true`: only such rows, maybe fewer) |
+| `delete: { rows: "<sql>" }` | a `DELETE` of the whole table removes exactly those rows (`subset: true` as above) |
 | `update: [{ where: "<sql>", set?: {…}, expect: allow\|deny }]` | every / none of the rows matching `where` are updated |
 | `delete: [{ where: "<sql>", expect: allow\|deny }]` | every / none of the rows matching `where` are deleted |
 | `update: allow\|deny`, `delete: allow\|deny` | the same, over every row of the table |
 | `select: todo`, `insert: todo`… | nothing runs; the cell is reported as unspecified |
 
-`defaults` takes the same operations keyed by identity, then table or `"*"` for every table; entries under
-`expect` win over a named table, which wins over `"*"`.
+A `rows` case can also be an element of a case list, next to `where` cases:
+`update: [{ set: {…}, rows: "…" }, { where: "…", set: {…}, expect: deny }]`.
+
+**Defaults.** `defaults` takes the same operations keyed by identity, then by table:
+
+| Key | Applies to |
+|---|---|
+| a table name | that table |
+| `"*[tenant_id]"`, `"*[org_id, deleted_at]"` | every table in scope that has all the listed columns |
+| `"*"` | every table in scope |
+
+Each operation comes from the most specific place that defines it: `expect`, then a named default, then
+`"*[…]"`, then `"*"`. Two `"*[…]"` defaults of one identity that give the same table the same operation are an
+error, and so is a filter that matches no table: a renamed column must not silently drop a rule.
+
+```yaml
+defaults:
+  alice:
+    "*[tenant_id]":               # never read or touch another tenant, for every table that has the column
+      select: { rows: "tenant_id = ${tenant_a}", subset: true }
+      update: { set: { tenant_id: "${tenant_a}" }, rows: "tenant_id = ${tenant_a}", subset: true }
+      delete: { rows: "tenant_id = ${tenant_a}", subset: true }
+      on_empty: skip
+    "*": { select: deny, update: deny, delete: deny, on_empty: skip }
+```
+
+**Empty tables.** A wildcard default reaches tables that have no rows yet, where a select, update or delete
+case can't fail: by default that is inconclusive (exit 2). `on_empty: skip` on a `"*"` or `"*[…]"` default
+skips those cases instead. A skipped case is not a pass: its cell counts as unspecified, is listed with the
+gaps, and fails the run under `unspecified: fail`. It is only for wildcards: for a table you name, add rows in
+`setup` or write `todo`.
 
 **Coverage.** Every run ends with `coverage 86/96 cells (89.6%) · 10 unspecified (warn)`: a cell is an
 identity × table × operation with at least one case. `unspecified: warn` (the default) also lists the gaps,
 `ignore` prints only that line, and `fail` makes any gap exit 1, so a table added without a spec breaks CI.
 `rlsspec cover` validates the spec and prints the matrix (`SIUD`, `·` for gaps) without running any case.
 
-**Updates and SELECT policies.** Postgres applies the SELECT policies to an `UPDATE` that reads a column
-(in `where`, or in the `SET c = c` rlsspec runs when a case has no `set`), so a too-wide UPDATE policy can
-hide behind a strict SELECT policy: rows the identity can't see are never updated. For update denies that
-matter, add a case that reads no column, which checks the UPDATE policies alone:
-`{ where: "true", set: { title: "x" }, expect: deny }`.
+**Updates and SELECT policies.** Postgres applies the SELECT policies to an `UPDATE` or `DELETE` that reads a
+column (in `where`, or in the `SET c = c` rlsspec runs when a case has no `set`), so a too-wide write policy
+can hide behind a strict SELECT policy: rows the identity can't see are never touched, and
+`{ where: "tenant_id = ${tenant_b}", expect: deny }` passes. Use the `rows` form for writes that matter:
+
+```yaml
+update: { set: { title: "x" }, rows: "tenant_id = ${tenant_a}" }
+delete: { rows: "tenant_id = ${tenant_a}", subset: true }
+```
+
+It runs the statement with no `WHERE` and only constants, so it reads no column and the write policies alone
+decide. Which rows it touched is read by the privileged role, before and after, and compared with the
+predicate: `updated 3 of the 9 rows it should not update: id=13, …` or `did not delete 1 of the 4 rows it
+should delete: id=3`. What to know:
+
+- Pick a `set` the policy accepts: a `WITH CHECK` violation fails the whole statement, which reads as no row
+  touched. Setting the tenant column to the identity's own tenant is a constant that changes nothing on its
+  rows and works on every tenant table.
+- A trigger or `ON DELETE CASCADE` that changes *other rows of the same table* makes the case inconclusive
+  (`the statement affected 6 rows, but 7 rows of notes changed`): the affected rows can't be told apart. Keep
+  `where` cases there. Triggers that write to other tables are fine.
+- `DELETE` over a table that others reference with `NO ACTION` or `RESTRICT` foreign keys is inconclusive.
+- A predicate matching no row is inconclusive, and with `subset: true` so is one matching every row.
+
+For an identity that should touch nothing, `update: deny` or `{ where: "true", set: { title: "x" }, expect:
+deny }` still say it best.
 
 ### Supabase
 
@@ -340,15 +398,18 @@ nothing is reported as a stale ignore, so ignores can't outlive what they excuse
 ### Output formats
 
 `test`, `lint` and `cover` take `--format text|json|junit` (`text` is the default; `cover` has no JUnit
-report). JSON and JUnit go to stdout without colour, and the exit code is the same whatever the format.
+report). The text report cuts descriptions at 64 characters and puts a long result on its own line; JSON and
+JUnit carry everything in full. Tables are listed by name. JSON and JUnit go to stdout without colour, and the exit code is the same whatever the format.
 Config and connection errors are always plain text on stderr, with nothing on stdout.
 
 - **JSON**: one document per run, starting with `"schema_version": 1` (frozen since v0.1.0) and ending with `"exit_code"`. `test`
   lists every case (`table`, `identity`, `op`, `origin`, `description`, `outcome`, `detail` and its
-  `location` in the spec), the coverage with its gaps, and the totals; `cover` the matrix; `lint` the findings,
-  the ignored count and the skipped rules. A breaking change to the format bumps `schema_version`.
+  `location` in the spec), the cases skipped by `on_empty: skip`, the coverage with its gaps, and the totals;
+  `cover` the matrix; `lint` the findings, the ignored count and the skipped rules. A breaking change to the
+  format bumps `schema_version`.
 - **JUnit**: for CI test reporters. `test` has one suite per table and one test per case (a failure is a
-  `<failure>`, an inconclusive case an `<error>`), plus a `coverage` suite under `unspecified: fail`. `lint`
+  `<failure>`, an inconclusive case an `<error>`, a skipped case `<skipped>`), plus a `coverage` suite under
+  `unspecified: fail`. `lint`
   has one suite per rule: errors fail, warnings and info pass with their hint in the output, as they do for
   the exit code.
 

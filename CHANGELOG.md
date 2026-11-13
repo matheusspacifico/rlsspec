@@ -6,6 +6,60 @@ All notable changes to rlsspec are documented here. The format is based on
 
 ## [Unreleased]
 
+A blanket spec you can write on a real schema, from rebuilding the specs of two real projects on 0.1.1.
+Everything is additive under `version: 1`: a spec that runs on 0.1.x keeps its meaning and its exit code,
+with one exception, a bug fix (partitioned tables, below). An older rlsspec rejects the new keys, so upgrade
+before using them.
+
+### Added
+
+- **`rows` for `update` and `delete`**: `update: { set: {…}, rows: "<sql>" }` and `delete: { rows: "<sql>" }`
+  pass when the statement, run over the whole table, touches exactly the rows the predicate matches
+  (`subset: true`: only such rows, maybe fewer). The statement has no `WHERE` and assigns only constants, so
+  it reads no column and the write policies alone decide: a `where … → deny` case reads a column, which
+  brings the SELECT policies in and can hide a write policy that is too wide. Failures name the rows:
+  `updated 2 of the 5 rows it should not update: id=7, id=9`, `did not delete 1 of the 4 rows it should
+  delete: id=3`. A `rows` case can stand alone as the operation's value or sit in a case list next to `where`
+  cases, in `expect` and in `defaults`. Inconclusive, never a guess: a trigger or a cascade that changed other
+  rows of the same table, a predicate matching no row, and with `subset` a predicate matching every row.
+- **`on_empty: skip`** on a wildcard default: its select, update and delete cases on a table with no rows are
+  skipped instead of inconclusive. A skipped case is not a pass: its cell counts as unspecified, is listed
+  with the gaps and fails the run under `unspecified: fail`. Without the key nothing changes, except that the
+  message now says how to skip.
+- **`"*[column, …]"`** in `defaults`: a default for every table in scope that has all the listed columns, so
+  a rule written in terms of `tenant_id` can be stated once. Precedence per operation is `expect`, a named
+  default, `"*[…]"`, then `"*"`. A filter that matches no table is an error, and so are two filters of one
+  identity that give the same table the same operation.
+- **`database.exclude`**: tables left out of scope (no case, no coverage cell, no table lint rule), for
+  migration bookkeeping and the like. An entry that matches no table is an error, and so is an `expect` or
+  `defaults` entry that names an excluded table. `rlsspec init --exclude a,b` writes it.
+- **Top-level `x-*` keys** are accepted and ignored: a home for YAML anchors shared across the spec.
+- JSON `test` reports gain a `skipped` array and `totals.skipped` (always present); JUnit marks skipped cases
+  with `<skipped message="empty table"/>`. `schema_version` stays 1.
+- `rlsspec test` on a spec where nothing is specified yet ends with a hint pointing at `todo` and
+  `rlsspec cover`.
+
+### Changed
+
+- **Tables are listed by name, then schema**, instead of in the order they were created, so reports no longer
+  depend on the order migrations ran in. This changes the text reports, `init`, and **the order of JSON
+  arrays**: `cover`'s `tables`, `coverage.gaps`, the cases a wildcard default expands to within `cases`, and
+  the JUnit suites. No field, type or value changes; cases written under `expect` keep the spec's order.
+- The text report cuts descriptions at 64 characters (keeping a final `→ allow` or `→ deny`), puts a result
+  that would pass 120 columns on the line below its case, one operation per line for a folded default, and
+  shortens UUIDs in the samples of a failure. JSON and JUnit keep everything in full.
+- A spec may use an anchor as often as it likes: the YAML parser's alias-to-anchor ratio check, a guard
+  against alias bombs in untrusted input, rejected specs with 100 aliases and more than 10 per anchor. Its
+  other limits stay.
+
+### Fixed
+
+- **`select` on a partitioned table compared rows by `ctid` alone, which repeats across partitions.** An
+  identity that saw the rows of one partition could pass `select: all`, and a correct `rows` case could fail
+  with leaks that weren't there. Rows are now compared by `(tableoid, ctid)`. A spec that passed only because
+  of this now fails, and one that failed only because of it now passes.
+
+
 ## [0.1.1] - 2026-09-27
 
 A correctness and polish release, from running v0.1.0 against two real projects. No new spec key.
