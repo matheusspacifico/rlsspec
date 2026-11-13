@@ -1,0 +1,10 @@
+---
+source: tests/select.rs
+expression: "run(\"partitioned_pass\", 0)"
+---
+events
+  ✓ alice  select  rows: tenant_id = '…000a'  3 visible
+readings
+  ✓ alice  select  rows: tenant_id = '…000a'  2 visible
+coverage 2/28 cells (7.1%) · 26 unspecified (ignore)
+0 failed · 2 passed · 0 inconclusive

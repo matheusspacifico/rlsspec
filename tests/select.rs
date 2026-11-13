@@ -76,3 +76,13 @@ fn deny_using_true_leaks_everything() {
 fn deny_public_permissive_policy_leaks_published_rows() {
     insta::assert_snapshot!(run("deny_permissive_widens", 1));
 }
+
+#[test]
+fn partitioned_rows_pass_although_partitions_share_ctids() {
+    insta::assert_snapshot!(run("partitioned_pass", 0));
+}
+
+#[test]
+fn partitioned_all_fails_when_only_one_partition_is_visible() {
+    insta::assert_snapshot!(run("partitioned_hidden", 1));
+}

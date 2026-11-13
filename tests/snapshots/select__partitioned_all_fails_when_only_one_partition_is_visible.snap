@@ -1,0 +1,10 @@
+---
+source: tests/select.rs
+expression: "run(\"partitioned_hidden\", 1)"
+---
+events
+  ✗ alice  select  all  hidden 6 of the 9 rows it should see: (tenant_id, id)=(00000000-0000-4000-8000-00000000000b, 4), (tenant_id, id)=(00000000-0000-4000-8000-00000000000b, 5), (tenant_id, id)=(00000000-0000-4000-8000-00000000000b, 6), (tenant_id, id)=(00000000-0000-4000-8000-00000000000c, 7), (tenant_id, id)=(00000000-0000-4000-8000-00000000000c, 8), …
+readings
+  ✗ alice  select  all  hidden 2 of the 4 rows it should see: ctid=(0,1) in readings_b, ctid=(0,2) in readings_b
+coverage 2/28 cells (7.1%) · 26 unspecified (ignore)
+2 failed · 0 passed · 0 inconclusive
