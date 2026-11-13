@@ -1,0 +1,14 @@
+# An ignore for a table that is out of scope matches nothing any more: a stale ignore.
+version: 1
+database:
+  url: "${env:DATABASE_URL}"
+  exclude: [public.schema_migrations]
+setup: [../writes/schema.sql, bookkeeping.sql]
+identities:
+  guest: { role: web_anon }
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }
+lint:
+  ignore:
+    - { rule: RLS001, table: schema_migrations, reason: "migration bookkeeping" }

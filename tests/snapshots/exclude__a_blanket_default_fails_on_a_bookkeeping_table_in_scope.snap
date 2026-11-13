@@ -1,0 +1,12 @@
+---
+source: tests/exclude.rs
+expression: "report(\"test\", \"in_scope\", 1)"
+---
+notes
+  ✓ guest  *  deny  4/4 ops
+tags
+  ✓ guest  *  deny  4/4 ops
+schema_migrations
+  ✗ guest  *  deny  3/4 ops · select: leaked 2 of the 2 rows it should not see: version=1, version=2
+coverage 12/12 cells (100.0%) · 0 unspecified (warn)
+1 failed · 11 passed · 0 inconclusive

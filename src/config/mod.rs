@@ -49,6 +49,15 @@ pub struct Ignore {
 pub struct Database {
     pub url: String,
     pub schemas: Vec<String>,
+    /// Tables left out of scope: no coverage cell, no wildcard case, no table lint rule.
+    pub exclude: Vec<Exclude>,
+}
+
+/// A `database.exclude` entry: a table name, resolved like any table reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Exclude {
+    pub table: String,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

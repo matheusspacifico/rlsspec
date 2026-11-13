@@ -1,0 +1,35 @@
+---
+source: tests/exclude.rs
+expression: out.stderr
+---
+error: table `goose_db_version` not found in schema public; a `database.exclude` entry must name a table in scope
+ --> tests/fixtures/exclude/errors.yaml:8:7
+  |
+8 |     - goose_db_version
+  |       ^
+
+error: table `public.schema_migrations` is already excluded at line 7
+ --> tests/fixtures/exclude/errors.yaml:9:7
+  |
+9 |     - public.schema_migrations
+  |       ^
+
+error: schema `archive` is not listed in `database.schemas`; a `database.exclude` entry must name a table in scope
+  --> tests/fixtures/exclude/errors.yaml:10:7
+   |
+10 |     - archive.tags
+   |       ^
+
+error: table `schema_migrations` is excluded by `database.exclude` at line 7, so nothing written for it would run; remove this entry or the exclusion
+  --> tests/fixtures/exclude/errors.yaml:17:5
+   |
+17 |     schema_migrations: { select: all }
+   |     ^
+
+error: table `public.schema_migrations` is excluded by `database.exclude` at line 7, so nothing written for it would run; remove this entry or the exclusion
+  --> tests/fixtures/exclude/errors.yaml:19:3
+   |
+19 |   public.schema_migrations:
+   |   ^
+
+error: stopped before running any case (5 errors in tests/fixtures/exclude/errors.yaml)

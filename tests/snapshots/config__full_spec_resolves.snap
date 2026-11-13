@@ -9,6 +9,7 @@ Config {
             "public",
             "app",
         ],
+        exclude: [],
     },
     safety: Safety {
         allowed_hosts: [],

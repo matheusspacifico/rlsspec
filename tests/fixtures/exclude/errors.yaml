@@ -1,0 +1,22 @@
+# Every way an exclusion can be wrong at run time: it matches no table, it repeats another one,
+# or the spec still says something about the table it removes.
+version: 1
+database:
+  url: "${env:DATABASE_URL}"
+  exclude:
+    - schema_migrations
+    - goose_db_version
+    - public.schema_migrations
+    - archive.tags
+setup: [../writes/schema.sql, bookkeeping.sql]
+identities:
+  guest: { role: web_anon }
+defaults:
+  guest:
+    "*": { select: deny }
+    schema_migrations: { select: all }
+expect:
+  public.schema_migrations:
+    guest: { insert: deny }
+  notes:
+    guest: { insert: deny }

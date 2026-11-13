@@ -90,6 +90,8 @@ impl<'de, A: MapAccess<'de>> MapAccess<'de> for SkipExtensions<A> {
 pub struct RawDatabase {
     pub url: Spanned<String>,
     pub schemas: Option<Spanned<Vec<Spanned<String>>>>,
+    #[serde(default)]
+    pub exclude: Vec<Spanned<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]

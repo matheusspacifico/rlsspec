@@ -1,0 +1,7 @@
+---
+source: tests/exclude.rs
+expression: "report(\"lint\", \"in_scope\", 1)"
+---
+✗ RLS001  schema_migrations            row level security is not enabled: web_anon sees every row
+! RLS008  schema_migrations  web_anon  `guest` is denied every operation, yet its role holds privileges here: revoke them
+1 error · 1 warning · 0 info · 0 ignored
