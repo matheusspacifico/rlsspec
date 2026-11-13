@@ -1,7 +1,7 @@
 use postgres::Transaction;
 
 use super::rows::{self, Row, samples, the_rows};
-use super::{Location, Outcome, RunError};
+use super::{Location, Outcome, RunError, empty_table, no_match};
 use crate::catalog::Table;
 use crate::config::{Identity, Select};
 use crate::identity;
@@ -53,15 +53,10 @@ pub fn check(
     let expected = rows.iter().filter(|r| r.expected).count();
     match select {
         Select::Deny | Select::All if rows.is_empty() => {
-            return Ok(Outcome::Inconclusive(format!(
-                "vacuous: {} has no rows, so this check cannot fail; add rows in setup ({at})",
-                table.sql_name()
-            )));
+            return Ok(Outcome::Inconclusive(empty_table(table, at, false)));
         }
         Select::Rows { .. } if expected == 0 => {
-            return Ok(Outcome::Inconclusive(format!(
-                "vacuous: the predicate matches no rows, so this check cannot fail ({at})"
-            )));
+            return Ok(Outcome::Inconclusive(no_match(at)));
         }
         _ => {}
     }

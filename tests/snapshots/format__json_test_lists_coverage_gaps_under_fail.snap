@@ -175,6 +175,7 @@ expression: out
       }
     }
   ],
+  "skipped": [],
   "coverage": {
     "policy": "fail",
     "total": 16,
@@ -196,7 +197,8 @@ expression: out
   "totals": {
     "passed": 12,
     "failed": 0,
-    "inconclusive": 0
+    "inconclusive": 0,
+    "skipped": 0
   },
   "exit_code": 1
 }

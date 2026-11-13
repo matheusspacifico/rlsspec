@@ -26,6 +26,14 @@ fn marked(outcome: &Outcome) -> (Style, &'static str, &str) {
         Outcome::Pass(detail) => (style::PASS, "✓", detail),
         Outcome::Fail(detail) => (style::FAIL, "✗", detail),
         Outcome::Inconclusive(detail) => (style::INCONCLUSIVE, "?", detail),
+        Outcome::Skipped(_) => (style::MUTED, "○", ""),
+    }
+}
+
+fn skipped(outcome: &Outcome) -> Option<String> {
+    match outcome {
+        Outcome::Skipped(reason) => Some(format!("skipped ({})", reason.text())),
+        _ => None,
     }
 }
 
@@ -37,12 +45,30 @@ fn line(result: &CaseResult) -> Line {
         identity: result.identity.clone(),
         op: result.op.as_str().to_owned(),
         description: result.description.clone(),
-        detail: detail.to_owned(),
+        detail: skipped(&result.outcome).unwrap_or_else(|| detail.to_owned()),
     }
 }
 
 /// One line for all the cases an identity got from `defaults` on a table.
-fn aggregate(results: &[&CaseResult]) -> Line {
+fn aggregate(all: &[&CaseResult]) -> Line {
+    let identity = all.first().map_or(String::new(), |r| r.identity.clone());
+    let results: Vec<&CaseResult> = all
+        .iter()
+        .copied()
+        .filter(|r| !matches!(r.outcome, Outcome::Skipped(_)))
+        .collect();
+    let skipped_note = all.iter().find_map(|r| skipped(&r.outcome));
+    let skipped_count = all.len() - results.len();
+    if let (true, Some(note)) = (results.is_empty(), &skipped_note) {
+        return Line {
+            style: style::MUTED,
+            marks: vec![(style::MUTED, "○")],
+            identity,
+            op: "*".to_owned(),
+            description: note.clone(),
+            detail: String::new(),
+        };
+    }
     let failed = results
         .iter()
         .find(|r| matches!(r.outcome, Outcome::Fail(_)));
@@ -64,11 +90,12 @@ fn aggregate(results: &[&CaseResult]) -> Line {
     };
     let style = marks[0].0;
 
-    let mut descriptions: Vec<&str> = results.iter().map(|r| r.description.as_str()).collect();
+    // Over every case of the line, skipped ones included: it says what the default asks for.
+    let mut descriptions: Vec<&str> = all.iter().map(|r| r.description.as_str()).collect();
     descriptions.dedup();
     let description = match descriptions.as_slice() {
-        [one] if results.len() > 1 => (*one).to_owned(),
-        _ => results
+        [one] if all.len() > 1 => (*one).to_owned(),
+        _ => all
             .iter()
             .map(|r| format!("{} {}", r.op.as_str(), r.description))
             .collect::<Vec<_>>()
@@ -87,17 +114,18 @@ fn aggregate(results: &[&CaseResult]) -> Line {
         .filter(|r| matches!(r.outcome, Outcome::Pass(_)))
         .count();
     let mut detail = format!("{passed}/{} {unit}", results.len());
-    for result in results {
+    for result in &results {
         if let Outcome::Fail(text) | Outcome::Inconclusive(text) = &result.outcome {
             let _ = write!(detail, " · {}: {text}", result.op.as_str());
         }
     }
+    if let Some(note) = skipped_note {
+        let _ = write!(detail, " · {skipped_count} {note}");
+    }
     Line {
         style,
         marks,
-        identity: results
-            .first()
-            .map_or(String::new(), |r| r.identity.clone()),
+        identity,
         op: "*".to_owned(),
         description,
         detail,
@@ -159,7 +187,13 @@ pub fn render(report: &Report) -> String {
         let mark_width = rows.iter().map(|r| r.marks.len()).max().unwrap_or(1);
         let identity_width = width(|r| &r.identity);
         let op_width = width(|r| &r.op);
-        let description_width = width(|r| &r.description);
+        // A line without a detail pads nothing, so it doesn't widen the column either.
+        let description_width = rows
+            .iter()
+            .filter(|r| !r.detail.is_empty())
+            .map(|r| r.description.chars().count())
+            .max()
+            .unwrap_or(0);
         let (header, muted) = (style::EMPHASIS, style::MUTED);
         let _ = writeln!(out, "{header}{table}{header:#}");
         for Line {
@@ -177,10 +211,18 @@ pub fn render(report: &Report) -> String {
             }
             mark.push_str(&" ".repeat(mark_width - marks.len()));
             let detail_style = if *s == style::PASS { Style::new() } else { *s };
-            let _ = writeln!(
+            let _ = write!(
                 out,
-                "  {mark} {identity:<identity_width$}  {muted}{op:<op_width$}{muted:#}  {description:<description_width$}  {detail_style}{detail}{detail_style:#}"
+                "  {mark} {identity:<identity_width$}  {muted}{op:<op_width$}{muted:#}  "
             );
+            let _ = if detail.is_empty() {
+                writeln!(out, "{s}{description}{s:#}")
+            } else {
+                writeln!(
+                    out,
+                    "{description:<description_width$}  {detail_style}{detail}{detail_style:#}"
+                )
+            };
         }
     }
 
@@ -190,13 +232,17 @@ pub fn render(report: &Report) -> String {
         let s = if n > 0 { when_nonzero } else { Style::new() };
         format!("{s}{n} {label}{s:#}")
     };
-    let _ = writeln!(
+    let _ = write!(
         out,
         "{} · {} · {}",
         count(totals.failed, "failed", style::FAIL),
         count(totals.passed, "passed", style::PASS),
         count(totals.inconclusive, "inconclusive", style::INCONCLUSIVE)
     );
+    if totals.skipped > 0 {
+        let _ = write!(out, " · {}", count(totals.skipped, "skipped", style::MUTED));
+    }
+    out.push('\n');
     out
 }
 

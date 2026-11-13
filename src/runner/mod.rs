@@ -5,11 +5,14 @@ mod rows;
 mod select;
 mod write;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+use postgres::Transaction;
 
 use crate::catalog::{self, Catalog, ExcludeError, Table};
 use crate::config::{
-    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, Spec, TableRef, Writes,
+    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, TableRef, Writes,
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session, Target};
@@ -60,6 +63,30 @@ pub enum Outcome {
     Pass(String),
     Fail(String),
     Inconclusive(String),
+    /// Not run, on purpose: not a pass, not inconclusive. Its cell counts as unspecified.
+    Skipped(Skip),
+}
+
+/// Why a case was not run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Skip {
+    /// A wildcard default with `on_empty: skip`, on a table with no rows.
+    EmptyTable,
+}
+
+impl Skip {
+    /// The stable identifier, as written in machine-readable reports.
+    pub fn id(self) -> &'static str {
+        match self {
+            Skip::EmptyTable => "empty_table",
+        }
+    }
+
+    pub fn text(self) -> &'static str {
+        match self {
+            Skip::EmptyTable => "empty table",
+        }
+    }
 }
 
 /// Where a case came from: an `expect` entry, or `defaults` (a named table or `*`).
@@ -94,6 +121,7 @@ pub struct Totals {
     pub passed: usize,
     pub failed: usize,
     pub inconclusive: usize,
+    pub skipped: usize,
 }
 
 impl Report {
@@ -108,13 +136,15 @@ impl Report {
                 Outcome::Pass(_) => totals.passed += 1,
                 Outcome::Fail(_) => totals.failed += 1,
                 Outcome::Inconclusive(_) => totals.inconclusive += 1,
+                Outcome::Skipped(_) => totals.skipped += 1,
             }
         }
         totals
     }
 
     /// 2 when anything is inconclusive (the run is incomplete), else 1 on failures or on
-    /// unspecified cells under `unspecified: fail`, else 0.
+    /// unspecified cells under `unspecified: fail`, else 0. A skipped case counts through its
+    /// cell, which is unspecified.
     pub fn exit_code(&self) -> u8 {
         let totals = self.totals();
         if totals.inconclusive > 0 {
@@ -212,7 +242,7 @@ fn in_session<T>(
         }
     }
     let tables = resolve_tables(config, &catalog, &mut diagnostics);
-    let plan = plan::build(config, &tables, &catalog, &mut diagnostics);
+    let mut plan = plan::build(config, &tables, &catalog, &mut diagnostics);
     for entry in &plan {
         check_columns(entry, &catalog, &mut diagnostics);
     }
@@ -226,6 +256,7 @@ fn in_session<T>(
         return Err(RunError::Config(source.invalid(diagnostics)));
     }
 
+    mark_empty(&mut session, &mut plan)?;
     let out = f(&mut session, &catalog, &plan)?;
     session.rollback()?;
     Ok(out)
@@ -237,6 +268,9 @@ struct Cell<'a> {
     path: &'a Path,
 }
 
+/// Where a case came from and where it is written.
+type Written = (Origin, Span);
+
 impl Cell<'_> {
     fn at(&self, span: Span) -> Location<'_> {
         Location(self.path, span)
@@ -246,7 +280,7 @@ impl Cell<'_> {
         &self,
         report: &mut Report,
         op: Op,
-        (origin, span): (Origin, Span),
+        (origin, span): Written,
         description: String,
         outcome: Outcome,
     ) {
@@ -261,94 +295,138 @@ impl Cell<'_> {
         });
     }
 
+    /// Records a case of `op`: skipped when its wildcard default says so and the table is empty,
+    /// otherwise run in its own savepoint.
+    fn case(
+        &self,
+        session: &mut Session,
+        report: &mut Report,
+        op: Op,
+        from: Written,
+        description: String,
+        run: impl FnOnce(&mut Transaction, Location) -> Result<Outcome, RunError>,
+    ) -> Result<(), RunError> {
+        let outcome = if self.entry.skips(op) {
+            Outcome::Skipped(Skip::EmptyTable)
+        } else {
+            let at = self.at(from.1);
+            let outcome = session.case(|tx| run(tx, at))??;
+            self.hinted(op, outcome, at)
+        };
+        self.push(report, op, from, description, outcome);
+        Ok(())
+    }
+
+    /// A vacuous case that a wildcard default put on an empty table says how to skip it.
+    fn hinted(&self, op: Op, outcome: Outcome, at: Location) -> Outcome {
+        match outcome {
+            Outcome::Inconclusive(text)
+                if text.starts_with(VACUOUS) && self.entry.hints_on_empty(op) =>
+            {
+                Outcome::Inconclusive(empty_table(self.entry.table, at, true))
+            }
+            other => other,
+        }
+    }
+
     fn check(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
+        self.select(session, report)?;
+        self.insert(session, report)?;
+        self.update(session, report)?;
+        self.delete(session, report)
+    }
+
+    fn select(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
         let (table, identity) = (self.entry.table, self.entry.identity);
-        if let Some((Spec::Given(case), origin)) = self.entry.select {
-            let at = self.at(case.span);
-            let outcome =
-                session.case(|tx| select::check(tx, table, identity, &case.select, at))??;
-            self.push(
-                report,
-                Op::Select,
-                (origin, case.span),
-                select::describe(&case.select),
-                outcome,
-            );
-        }
-        match self.entry.insert {
+        let Some(planned) = self.entry.select else {
+            return Ok(());
+        };
+        let Some(case) = planned.given() else {
+            return Ok(());
+        };
+        let from = (planned.origin, case.span);
+        let description = select::describe(&case.select);
+        self.case(session, report, Op::Select, from, description, |tx, at| {
+            select::check(tx, table, identity, &case.select, at)
+        })
+    }
+
+    fn insert(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
+        let (table, identity) = (self.entry.table, self.entry.identity);
+        let Some(planned) = self.entry.insert else {
+            return Ok(());
+        };
+        match planned.given() {
             // `insert: allow` is rejected when the config is loaded.
-            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
-                let outcome =
-                    session.case(|tx| insert_deny::check(tx, table, &self.name, identity))??;
+            Some(Writes::Shorthand { expect, span }) => {
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Insert, (origin, *span), description, outcome);
+                let from = (planned.origin, *span);
+                self.case(session, report, Op::Insert, from, description, |tx, _| {
+                    Ok(insert_deny::check(tx, table, &self.name, identity)?)
+                })?;
             }
-            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
+            Some(Writes::Cases(cases)) => {
                 for case in cases {
-                    let at = self.at(case.span);
-                    let outcome =
-                        session.case(|tx| write::insert(tx, table, identity, case, at))??;
-                    self.push(
-                        report,
-                        Op::Insert,
-                        (origin, case.span),
-                        write::describe_insert(case),
-                        outcome,
-                    );
+                    let description = write::describe_insert(case);
+                    let from = (planned.origin, case.span);
+                    self.case(session, report, Op::Insert, from, description, |tx, at| {
+                        write::insert(tx, table, identity, case, at)
+                    })?;
                 }
             }
-            Some((Spec::Todo, _)) | None => {}
+            None => {}
         }
-        match self.entry.update {
-            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
-                let at = self.at(*span);
-                let outcome = session.case(|tx| {
+        Ok(())
+    }
+
+    fn update(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
+        let (table, identity) = (self.entry.table, self.entry.identity);
+        let Some(planned) = self.entry.update else {
+            return Ok(());
+        };
+        match planned.given() {
+            Some(Writes::Shorthand { expect, span }) => {
+                let description = write::expectation(*expect).to_owned();
+                let from = (planned.origin, *span);
+                self.case(session, report, Op::Update, from, description, |tx, at| {
                     write::modify(tx, table, identity, Modify::Update(None), None, *expect, at)
-                })??;
-                let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Update, (origin, *span), description, outcome);
+                })?;
             }
-            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
+            Some(Writes::Cases(cases)) => {
                 for case in cases {
-                    let at = self.at(case.span);
                     let set = case.set.as_deref();
-                    let outcome = session.case(|tx| {
-                        let kind = Modify::Update(set);
-                        write::modify(
-                            tx,
-                            table,
-                            identity,
-                            kind,
-                            Some(&case.predicate),
-                            case.expect,
-                            at,
-                        )
-                    })??;
                     let description = write::describe_modify(&case.predicate, set, case.expect);
-                    self.push(
-                        report,
-                        Op::Update,
-                        (origin, case.span),
-                        description,
-                        outcome,
-                    );
+                    let from = (planned.origin, case.span);
+                    self.case(session, report, Op::Update, from, description, |tx, at| {
+                        let (kind, predicate) =
+                            (Modify::Update(set), Some(case.predicate.as_str()));
+                        write::modify(tx, table, identity, kind, predicate, case.expect, at)
+                    })?;
                 }
             }
-            Some((Spec::Todo, _)) | None => {}
+            None => {}
         }
-        match self.entry.delete {
-            Some((Spec::Given(Writes::Shorthand { expect, span }), origin)) => {
-                let at = self.at(*span);
-                let outcome = session.case(|tx| {
-                    write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
-                })??;
+        Ok(())
+    }
+
+    fn delete(&self, session: &mut Session, report: &mut Report) -> Result<(), RunError> {
+        let (table, identity) = (self.entry.table, self.entry.identity);
+        let Some(planned) = self.entry.delete else {
+            return Ok(());
+        };
+        match planned.given() {
+            Some(Writes::Shorthand { expect, span }) => {
                 let description = write::expectation(*expect).to_owned();
-                self.push(report, Op::Delete, (origin, *span), description, outcome);
+                let from = (planned.origin, *span);
+                self.case(session, report, Op::Delete, from, description, |tx, at| {
+                    write::modify(tx, table, identity, Modify::Delete, None, *expect, at)
+                })?;
             }
-            Some((Spec::Given(Writes::Cases(cases)), origin)) => {
+            Some(Writes::Cases(cases)) => {
                 for case in cases {
-                    let at = self.at(case.span);
-                    let outcome = session.case(|tx| {
+                    let description = write::describe_modify(&case.predicate, None, case.expect);
+                    let from = (planned.origin, case.span);
+                    self.case(session, report, Op::Delete, from, description, |tx, at| {
                         let predicate = Some(case.predicate.as_str());
                         write::modify(
                             tx,
@@ -359,36 +437,76 @@ impl Cell<'_> {
                             case.expect,
                             at,
                         )
-                    })??;
-                    let description = write::describe_modify(&case.predicate, None, case.expect);
-                    self.push(
-                        report,
-                        Op::Delete,
-                        (origin, case.span),
-                        description,
-                        outcome,
-                    );
+                    })?;
                 }
             }
-            Some((Spec::Todo, _)) | None => {}
+            None => {}
         }
         Ok(())
     }
 }
 
+/// How every message of a case that cannot fail starts (hard rule 2).
+const VACUOUS: &str = "vacuous: ";
+
+/// A case over a table with no rows. `wildcard`: it was expanded from a wildcard default, which
+/// can say `on_empty: skip`.
+fn empty_table(table: &Table, at: Location, wildcard: bool) -> String {
+    let way_out = if wildcard {
+        "add rows in setup, or set on_empty: skip on this \"*\" default"
+    } else {
+        "add rows in setup"
+    };
+    format!(
+        "{VACUOUS}{} has no rows, so this check cannot fail; {way_out} ({at})",
+        table.sql_name()
+    )
+}
+
+/// A case whose predicate matches no row.
+fn no_match(at: Location) -> String {
+    format!("{VACUOUS}the predicate matches no rows, so this check cannot fail ({at})")
+}
+
+/// Looks up whether the table is empty for the entries that have cases from a wildcard default.
+fn mark_empty(session: &mut Session, plan: &mut [plan::Entry]) -> Result<(), RunError> {
+    let mut known: HashMap<u32, bool> = HashMap::new();
+    for entry in plan {
+        if !Op::ALL.into_iter().any(|op| entry.asks_about_empty(op)) {
+            continue;
+        }
+        entry.empty = match known.get(&entry.table.oid) {
+            Some(empty) => *empty,
+            None => {
+                let empty = is_empty(session, entry.table)?;
+                known.insert(entry.table.oid, empty);
+                empty
+            }
+        };
+    }
+    Ok(())
+}
+
+/// Whether `table` has no rows, as the admin. When that can't be read the table counts as not
+/// empty: its cases run and report the problem themselves.
+fn is_empty(session: &mut Session, table: &Table) -> Result<bool, RunError> {
+    let sql = format!("SELECT NOT EXISTS (SELECT FROM {})", table.sql_name());
+    let empty = session.case(|tx| {
+        pg::set_local(tx, "row_security", "off")?;
+        tx.query_one(&sql, &[]).map(|row| row.get::<_, bool>(0))
+    })?;
+    Ok(empty.unwrap_or(false))
+}
+
 /// Every column in `values` and `set` must exist and be writable (not generated).
 fn check_columns(entry: &plan::Entry, catalog: &Catalog, diagnostics: &mut Vec<Diagnostic>) {
     let table = entry.table;
-    let inserts = match entry.insert {
-        Some((Spec::Given(Writes::Cases(cases)), _)) => {
-            cases.iter().map(|c| c.values.as_slice()).collect()
-        }
+    let inserts = match entry.insert.and_then(|p| p.given()) {
+        Some(Writes::Cases(cases)) => cases.iter().map(|c| c.values.as_slice()).collect(),
         _ => Vec::new(),
     };
-    let updates = match entry.update {
-        Some((Spec::Given(Writes::Cases(cases)), _)) => {
-            cases.iter().filter_map(|c| c.set.as_deref()).collect()
-        }
+    let updates = match entry.update.and_then(|p| p.given()) {
+        Some(Writes::Cases(cases)) => cases.iter().filter_map(|c| c.set.as_deref()).collect(),
         _ => Vec::new(),
     };
     let name = catalog.display_name(table);

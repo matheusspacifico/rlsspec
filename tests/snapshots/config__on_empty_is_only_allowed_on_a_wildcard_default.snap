@@ -1,0 +1,23 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\ndefaults:\n  alice:\n    \"*\": { on_empty: skip }\n    notes: { select: deny, on_empty: skip }\nexpect:\n  tags:\n    alice: { select: deny, on_empty: inconclusive }\n\"#)"
+---
+error: no operations given; expected select, insert, update or delete
+ --> rlsspec.yaml:7:5
+  |
+7 |     "*": { on_empty: skip }
+  |     ^
+
+error: `on_empty` is only allowed on a `"*"` default; this table is named on purpose, so add rows in `setup` or write `todo`
+ --> rlsspec.yaml:8:38
+  |
+8 |     notes: { select: deny, on_empty: skip }
+  |                                      ^
+
+error: `on_empty` is only allowed on a `"*"` default; this table is named on purpose, so add rows in `setup` or write `todo`
+  --> rlsspec.yaml:11:38
+   |
+11 |     alice: { select: deny, on_empty: inconclusive }
+   |                                      ^
+
+error: could not load rlsspec.yaml (3 errors)

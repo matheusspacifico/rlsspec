@@ -12,8 +12,8 @@ use super::vars::{self, Mode, Reference};
 use super::{
     Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
     DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Exclude, Expectation, Extensions,
-    Guc, Identity, Ignore, InsertCase, Lint, Ops, Safety, Select, SelectCase, Span, Spec, TableRef,
-    UpdateCase, Writes,
+    Guc, Identity, Ignore, InsertCase, Lint, OnEmpty, Ops, Safety, Select, SelectCase, Span, Spec,
+    TableRef, UpdateCase, Writes,
 };
 use crate::lint::{Key, Rule};
 
@@ -449,6 +449,18 @@ impl Resolver<'_> {
                 "no operations given; expected select, insert, update or delete".into(),
             );
         }
+        let on_empty = match &raw.on_empty {
+            Some(value) if table != TableRef::All => {
+                self.error(
+                    span(value),
+                    "`on_empty` is only allowed on a `\"*\"` default; this table is named on purpose, so add rows in `setup` or write `todo`"
+                        .into(),
+                );
+                OnEmpty::default()
+            }
+            Some(value) => value.value,
+            None => OnEmpty::default(),
+        };
         if let Some(insert) = &raw.insert
             && matches!(insert.value, RawWrites::Shorthand(Expectation::Allow))
         {
@@ -488,6 +500,7 @@ impl Resolver<'_> {
             table_span,
             identity: identity.to_owned(),
             ops,
+            on_empty,
             span: at,
         }
     }

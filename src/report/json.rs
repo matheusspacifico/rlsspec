@@ -15,6 +15,7 @@ struct TestDocument<'a> {
     schema_version: u32,
     command: &'static str,
     cases: Vec<Case<'a>>,
+    skipped: Vec<SkippedCase<'a>>,
     coverage: CoverageSummary<'a>,
     totals: TestTotals,
     exit_code: u8,
@@ -29,6 +30,18 @@ struct Case<'a> {
     description: &'a str,
     outcome: &'static str,
     detail: &'a str,
+    location: Location,
+}
+
+/// A case that was not run. It is never in `cases`, whose `outcome` stays pass, fail or inconclusive.
+#[derive(Serialize)]
+struct SkippedCase<'a> {
+    table: &'a str,
+    identity: &'a str,
+    op: &'static str,
+    origin: &'static str,
+    description: &'a str,
+    reason: &'static str,
     location: Location,
 }
 
@@ -54,6 +67,7 @@ struct TestTotals {
     passed: usize,
     failed: usize,
     inconclusive: usize,
+    skipped: usize,
 }
 
 #[derive(Serialize)]
@@ -101,40 +115,53 @@ fn document(value: &impl Serialize) -> Result<String, serde_json::Error> {
 
 /// Every case, never folded: grouping `defaults` cases on one line is a text-only presentation.
 pub fn render(report: &Report) -> Result<String, serde_json::Error> {
-    let cases = report
-        .results
-        .iter()
-        .map(|result| {
-            let (outcome, detail) = match &result.outcome {
-                Outcome::Pass(detail) => ("pass", detail),
-                Outcome::Fail(detail) => ("fail", detail),
-                Outcome::Inconclusive(detail) => ("inconclusive", detail),
-            };
-            Case {
-                table: &result.table,
-                identity: &result.identity,
-                op: result.op.as_str(),
-                origin: match result.origin {
-                    Origin::Expect => "expect",
-                    Origin::Default => "default",
-                },
-                description: &result.description,
-                outcome,
-                detail,
-                location: Location::new(&report.spec, result.span),
+    let origin = |origin: Origin| match origin {
+        Origin::Expect => "expect",
+        Origin::Default => "default",
+    };
+    let mut cases = Vec::new();
+    let mut skipped = Vec::new();
+    for result in &report.results {
+        let (outcome, detail) = match &result.outcome {
+            Outcome::Pass(detail) => ("pass", detail),
+            Outcome::Fail(detail) => ("fail", detail),
+            Outcome::Inconclusive(detail) => ("inconclusive", detail),
+            Outcome::Skipped(reason) => {
+                skipped.push(SkippedCase {
+                    table: &result.table,
+                    identity: &result.identity,
+                    op: result.op.as_str(),
+                    origin: origin(result.origin),
+                    description: &result.description,
+                    reason: reason.id(),
+                    location: Location::new(&report.spec, result.span),
+                });
+                continue;
             }
-        })
-        .collect();
+        };
+        cases.push(Case {
+            table: &result.table,
+            identity: &result.identity,
+            op: result.op.as_str(),
+            origin: origin(result.origin),
+            description: &result.description,
+            outcome,
+            detail,
+            location: Location::new(&report.spec, result.span),
+        });
+    }
     let totals = report.totals();
     document(&TestDocument {
         schema_version: SCHEMA_VERSION,
         command: "test",
         cases,
+        skipped,
         coverage: coverage_summary(&report.coverage),
         totals: TestTotals {
             passed: totals.passed,
             failed: totals.failed,
             inconclusive: totals.inconclusive,
+            skipped: totals.skipped,
         },
         exit_code: report.exit_code(),
     })

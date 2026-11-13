@@ -7,7 +7,7 @@ use serde::de::{self, DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqA
 use serde_saphyr::Spanned;
 
 use super::map::SpannedMap;
-use super::{Expectation, Unspecified};
+use super::{Expectation, OnEmpty, Unspecified};
 
 pub type Value = Spanned<Option<String>>;
 
@@ -137,6 +137,7 @@ pub struct RawOps {
     pub insert: Option<Spanned<RawWrites<RawInsert>>>,
     pub update: Option<Spanned<RawWrites<RawUpdate>>>,
     pub delete: Option<Spanned<RawWrites<RawDelete>>>,
+    pub on_empty: Option<Spanned<OnEmpty>>,
 }
 
 #[derive(Debug)]
