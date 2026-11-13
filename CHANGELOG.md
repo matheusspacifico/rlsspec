@@ -6,6 +6,8 @@ All notable changes to rlsspec are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-13
+
 A blanket spec you can write on a real schema, from rebuilding the specs of two real projects on 0.1.1.
 Everything is additive under `version: 1`: a spec that runs on 0.1.x keeps its meaning and its exit code,
 with one exception, a bug fix (partitioned tables, below). An older rlsspec rejects the new keys, so upgrade
@@ -133,6 +135,7 @@ The first release: check Postgres Row Level Security against a spec of the acces
   (`ghcr.io/matheusspacifico/rlsspec`) and a GitHub Action (`matheusspacifico/rlsspec`).
 - Two runnable examples: `examples/multitenant` (plain Postgres) and `examples/supabase-todo`.
 
-[Unreleased]: https://github.com/matheusspacifico/rlsspec/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/matheusspacifico/rlsspec/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/matheusspacifico/rlsspec/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/matheusspacifico/rlsspec/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/matheusspacifico/rlsspec/releases/tag/v0.1.0
