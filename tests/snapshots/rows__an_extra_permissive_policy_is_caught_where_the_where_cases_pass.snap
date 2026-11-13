@@ -1,0 +1,11 @@
+---
+source: tests/rows.rs
+expression: out
+---
+notes
+  ✓ alice  update  where tenant_id = '…000b' set body = 'x' → deny  affected 0 of 3 rows
+  ✗ alice  update  set body = 'x' · rows: tenant_id = '…000a'       updated 1 of the 3 rows it should not update: id=4
+  ✓ alice  delete  where tenant_id = '…000b' → deny                 affected 0 of 3 rows
+  ✗ alice  delete  rows: tenant_id = '…000a'                        deleted 1 of the 3 rows it should not delete: id=4
+coverage 2/16 cells (12.5%) · 14 unspecified (ignore)
+2 failed · 2 passed · 0 inconclusive

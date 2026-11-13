@@ -162,6 +162,32 @@ expect:
         );
     }
 
+    /// RLS008 reads this: a `rows` case compares rows, so it is a cell with a case but not a deny.
+    #[test]
+    fn a_rows_case_specifies_its_cell_and_is_not_a_deny() {
+        let yaml = |delete: &str| {
+            format!(
+                "version: 1\ndatabase: {{ url: postgres://localhost/db }}\nidentities:\n  alice: {{ role: app }}\nexpect:\n  notes:\n    alice: {{ select: deny, insert: deny, update: deny, delete: {delete} }}\n"
+            )
+        };
+        let denies = |delete: &str| {
+            let config =
+                config::parse(&yaml(delete), Path::new("rlsspec.yaml"), &|_| None).unwrap();
+            let catalog = Catalog::new(&["public"], &[("public", "notes")]);
+            let mut diagnostics = Vec::new();
+            let resolved = resolve_tables(&config, &catalog, &mut diagnostics);
+            let plan = plan::build(&config, &resolved, &catalog, &mut diagnostics);
+            assert_eq!(plan[0].specified(), [true; 4]);
+            plan[0].denies_everything()
+        };
+        assert!(denies("deny"));
+        assert!(denies("[{ where: \"true\", expect: deny }]"));
+        assert!(!denies("{ rows: \"false\", subset: true }"));
+        assert!(!denies(
+            "[{ where: \"true\", expect: deny }, { rows: \"id = 1\" }]"
+        ));
+    }
+
     #[test]
     fn full_coverage_never_fails() {
         let coverage = coverage(

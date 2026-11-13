@@ -1,0 +1,9 @@
+---
+source: tests/rows.rs
+expression: out
+---
+notes
+  ? alice  delete  rows: tenant_id = '…000a'           the statement affected 3 rows, but 4 rows of notes changed: a trigger or a cascade also changed rows of this table, so the affected rows can't be identified; use `where` cases here (tests/fixtures/rows/cascade.yaml:17:11)
+  ? alice  delete  rows: tenant_id = '…000a' (subset)  the statement affected 3 rows, but 4 rows of notes changed: a trigger or a cascade also changed rows of this table, so the affected rows can't be identified; use `where` cases here (tests/fixtures/rows/cascade.yaml:18:11)
+coverage 1/16 cells (6.2%) · 15 unspecified (ignore)
+0 failed · 0 passed · 2 inconclusive

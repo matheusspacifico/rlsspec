@@ -1,0 +1,13 @@
+---
+source: tests/rows.rs
+expression: "run(\"vacuous\", 2)"
+---
+notes
+  ? alice  update  set body = 'x' · rows: id > 100       vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/rows/vacuous.yaml:17:11)
+  ? alice  update  set body = 'x' · rows: true (subset)  vacuous: the predicate matches every row, so with `subset` this check cannot fail (tests/fixtures/rows/vacuous.yaml:18:11)
+  ? alice  delete  rows: id > 100 (subset)               vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/rows/vacuous.yaml:20:11)
+  ? alice  delete  rows: id is not null (subset)         vacuous: the predicate matches every row, so with `subset` this check cannot fail (tests/fixtures/rows/vacuous.yaml:21:11)
+drafts
+  ? alice  delete  rows: true  vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup (tests/fixtures/rows/vacuous.yaml:24:15)
+coverage 3/24 cells (12.5%) · 21 unspecified (ignore)
+0 failed · 0 passed · 5 inconclusive

@@ -1,0 +1,9 @@
+---
+source: tests/rows.rs
+expression: "run(\"subset_leak\", 1)"
+---
+notes
+  ✗ alice  update  set body = 'x' · rows: tenant_id = '…000a' (subset)  updated 1 of the 3 rows it should not update: id=4
+  ✗ alice  delete  rows: tenant_id = '…000a' (subset)                   deleted 1 of the 3 rows it should not delete: id=4
+coverage 2/16 cells (12.5%) · 14 unspecified (ignore)
+2 failed · 0 passed · 0 inconclusive

@@ -428,3 +428,93 @@ expect:
         "{out}"
     );
 }
+
+#[test]
+fn rows_cases_resolve_for_update_and_delete() {
+    let config = parse(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+vars: { tenant: 0191e6a2-0000-7000-8000-00000000000a }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { delete: { rows: "true", subset: true } }
+expect:
+  notes:
+    alice:
+      update: { set: { body: "x" }, rows: "tenant_id = ${tenant}" }
+      delete:
+        - { rows: "tenant_id = ${tenant}", subset: true }
+        - { where: "id = 1", expect: deny }
+"#,
+    )
+    .unwrap();
+    let ops = &config.expect[0].ops;
+    let Some(Spec::Given(Writes::Cases(update))) = &ops.update else {
+        panic!("{ops:?}");
+    };
+    assert_eq!(update.len(), 1);
+    assert_eq!(
+        update[0].target,
+        config::Affects::Rows {
+            predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'".into(),
+            subset: false
+        }
+    );
+    assert!(update[0].set.is_some());
+    let Some(Spec::Given(Writes::Cases(delete))) = &ops.delete else {
+        panic!("{ops:?}");
+    };
+    assert!(matches!(
+        delete[0].target,
+        config::Affects::Rows { subset: true, .. }
+    ));
+    assert_eq!(delete[1].target.expect(), Some(config::Expectation::Deny));
+    assert_eq!(delete[0].target.expect(), None);
+}
+
+#[test]
+fn invalid_rows_cases_are_located() {
+    insta::assert_snapshot!(errors(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+expect:
+  notes:
+    alice:
+      update:
+        - { rows: "true" }
+        - { set: { body: "x" }, rows: "true", where: "id = 1" }
+        - { set: { body: "x" }, rows: "true", expect: deny }
+        - { where: "id = 1", subset: true, expect: deny }
+        - { where: "id = 1" }
+        - { set: { body: "x" } }
+      delete: { where: "id = 1", expect: deny }
+  tags:
+    alice:
+      update: { rows: "true" }
+      delete:
+        - { expect: allow }
+"#
+    ));
+    let out = errors(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n  notes:\n    alice:\n      delete: { rows: \"true\", set: { body: x } }\n",
+    );
+    assert!(
+        out.starts_with(
+            "error: unknown field `set`, expected one of where, expect, rows, subset\n"
+        ),
+        "{out}"
+    );
+    let out = errors(
+        "version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n  notes:\n    alice:\n      insert: { values: { id: 1 }, expect: deny }\n",
+    );
+    assert!(
+        out.starts_with(
+            "error: invalid type: map, expected `allow`, `deny`, `todo` or a list of cases\n"
+        ),
+        "{out}"
+    );
+}

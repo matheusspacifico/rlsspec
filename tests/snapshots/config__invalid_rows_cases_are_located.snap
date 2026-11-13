@@ -1,0 +1,59 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\nexpect:\n  notes:\n    alice:\n      update:\n        - { rows: \"true\" }\n        - { set: { body: \"x\" }, rows: \"true\", where: \"id = 1\" }\n        - { set: { body: \"x\" }, rows: \"true\", expect: deny }\n        - { where: \"id = 1\", subset: true, expect: deny }\n        - { where: \"id = 1\" }\n        - { set: { body: \"x\" } }\n      delete: { where: \"id = 1\", expect: deny }\n  tags:\n    alice:\n      update: { rows: \"true\" }\n      delete:\n        - { expect: allow }\n\"#)"
+---
+error: an update `rows` case needs `set`: its statement assigns constants and reads no column, which a `SET c = c` would
+ --> rlsspec.yaml:9:11
+  |
+9 |         - { rows: "true" }
+  |           ^
+
+error: `rows` cannot be combined with `where`: a `rows` case compares the rows the statement affects, a `where` case expects `allow` or `deny`
+  --> rlsspec.yaml:10:54
+   |
+10 |         - { set: { body: "x" }, rows: "true", where: "id = 1" }
+   |                                                      ^
+
+error: `rows` cannot be combined with `expect`: a `rows` case compares the rows the statement affects, a `where` case expects `allow` or `deny`
+  --> rlsspec.yaml:11:55
+   |
+11 |         - { set: { body: "x" }, rows: "true", expect: deny }
+   |                                                       ^
+
+error: `subset` is only allowed with `rows`
+  --> rlsspec.yaml:12:38
+   |
+12 |         - { where: "id = 1", subset: true, expect: deny }
+   |                                      ^
+
+error: a `where` case needs `expect: allow` or `expect: deny`
+  --> rlsspec.yaml:13:11
+   |
+13 |         - { where: "id = 1" }
+   |           ^
+
+error: a case needs `where` with `expect`, or `rows`
+  --> rlsspec.yaml:14:11
+   |
+14 |         - { set: { body: "x" } }
+   |           ^
+
+error: a case written as a mapping must use `rows`; write `where` cases as a list
+  --> rlsspec.yaml:15:15
+   |
+15 |       delete: { where: "id = 1", expect: deny }
+   |               ^
+
+error: an update `rows` case needs `set`: its statement assigns constants and reads no column, which a `SET c = c` would
+  --> rlsspec.yaml:18:15
+   |
+18 |       update: { rows: "true" }
+   |               ^
+
+error: a case needs `where` with `expect`, or `rows`
+  --> rlsspec.yaml:20:11
+   |
+20 |         - { expect: allow }
+   |           ^
+
+error: could not load rlsspec.yaml (9 errors)

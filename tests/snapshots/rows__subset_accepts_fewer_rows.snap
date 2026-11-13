@@ -1,0 +1,9 @@
+---
+source: tests/rows.rs
+expression: "run(\"subset_pass\", 0)"
+---
+notes
+  ✓ alice  update  set body = 'x' · rows: tenant_id = '…000a' (subset)  updated 2 of 3 rows
+  ✓ alice  delete  rows: tenant_id = '…000a' (subset)                   deleted 2 of 3 rows
+coverage 2/16 cells (12.5%) · 14 unspecified (ignore)
+0 failed · 2 passed · 0 inconclusive

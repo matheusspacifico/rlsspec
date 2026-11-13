@@ -106,10 +106,16 @@ impl Entry<'_> {
     /// Whether every operation is denied: `select: deny`, and for each write the `deny` shorthand
     /// or only `expect: deny` cases. A `todo` or missing operation is not a deny.
     pub fn denies_everything(&self) -> bool {
-        fn writes<C>(op: Option<Planned<Writes<C>>>, expect: fn(&C) -> Expectation) -> bool {
+        // A `rows` case has no expectation: it compares rows, so it is not a deny.
+        fn writes<C>(
+            op: Option<Planned<Writes<C>>>,
+            expect: fn(&C) -> Option<Expectation>,
+        ) -> bool {
             match op.and_then(|p| p.given()) {
                 Some(Writes::Shorthand { expect, .. }) => *expect == Expectation::Deny,
-                Some(Writes::Cases(cases)) => cases.iter().all(|c| expect(c) == Expectation::Deny),
+                Some(Writes::Cases(cases)) => {
+                    cases.iter().all(|c| expect(c) == Some(Expectation::Deny))
+                }
                 None => false,
             }
         }
@@ -121,9 +127,9 @@ impl Entry<'_> {
             })
         );
         select
-            && writes(self.insert, |c| c.expect)
-            && writes(self.update, |c| c.expect)
-            && writes(self.delete, |c| c.expect)
+            && writes(self.insert, |c| Some(c.expect))
+            && writes(self.update, |c| c.target.expect())
+            && writes(self.delete, |c| c.target.expect())
     }
 }
 

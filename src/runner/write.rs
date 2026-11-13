@@ -48,7 +48,7 @@ pub fn describe_modify(predicate: &str, set: Option<&[Assignment]>, expect: Expe
     }
 }
 
-fn describe_assignments(assignments: &[Assignment]) -> String {
+pub(super) fn describe_assignments(assignments: &[Assignment]) -> String {
     assignments
         .iter()
         .map(|a| {
@@ -65,7 +65,7 @@ fn describe_assignments(assignments: &[Assignment]) -> String {
 
 /// Column list, `$n::text::<type>` casts and the text parameters for `assignments`.
 /// Columns were checked against the catalog before any case ran.
-fn typed(
+pub(super) fn typed(
     table: &Table,
     assignments: &[Assignment],
 ) -> (Vec<String>, Vec<String>, Vec<Option<String>>) {
@@ -83,7 +83,7 @@ fn typed(
     (columns, casts, params)
 }
 
-fn as_params(values: &[Option<String>]) -> Vec<&(dyn ToSql + Sync)> {
+pub(super) fn as_params(values: &[Option<String>]) -> Vec<&(dyn ToSql + Sync)> {
     values.iter().map(|v| v as &(dyn ToSql + Sync)).collect()
 }
 
@@ -223,13 +223,13 @@ pub fn modify(
     Ok(outcome)
 }
 
-fn denied_on(err: &postgres::Error, table: &Table) -> bool {
+pub(super) fn denied_on(err: &postgres::Error, table: &Table) -> bool {
     pg::is_denied_on(err, &table.schema, &table.name)
 }
 
 /// Any error but a deny on the target. A `42501` from a trigger, a function or another object says the
 /// row was rejected, but not by what the spec is about (§4.3).
-fn failed(
+pub(super) fn failed(
     verb: &str,
     identity: &Identity,
     table: &Table,
