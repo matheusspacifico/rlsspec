@@ -34,15 +34,13 @@ fn server() -> Arc<Server> {
         return server;
     }
     let tag = env::var("RLSSPEC_PG_TAG").unwrap_or_else(|_| "17".into());
-    let container = Postgres::default().with_tag(tag).start().unwrap();
-    let port = container.get_host_port_ipv4(5432).unwrap();
+    let (container, port, mut admin) =
+        start_ready(|| Postgres::default().with_tag(&tag).start().unwrap());
+    admin.batch_execute(ROLES).unwrap();
     let server = Arc::new(Server {
         _container: container,
         port,
     });
-    connect_when_ready(&url(port, "postgres", "postgres", "postgres"))
-        .batch_execute(ROLES)
-        .unwrap();
     *shared = Arc::downgrade(&server);
     server
 }
@@ -55,20 +53,65 @@ fn connect(url: &str) -> Client {
     Client::connect(url, NoTls).unwrap()
 }
 
-/// The first connection to a fresh container. Its "ready" log line can come a moment before the server
-/// accepts TCP connections, so retry for a few seconds and give up with the last error.
-pub fn connect_when_ready(url: &str) -> Client {
-    const GIVE_UP: Duration = Duration::from_secs(15);
+/// Starts a container and makes the first connection to it, as the superuser. A fresh container
+/// sometimes never accepts connections on its published port although its "ready" log line was
+/// seen (once after 15 s and once after 120 s of "connection refused" on a busy machine, while
+/// the next container of the same run was fine). So a container that doesn't answer within
+/// `RLSSPEC_TEST_CONNECT_TIMEOUT` seconds (default 30) is replaced by a fresh one, up to three
+/// times, and every give-up reports the container's state and the end of its log.
+pub fn start_ready(start: impl Fn() -> Container<Postgres>) -> (Container<Postgres>, u16, Client) {
+    const ATTEMPTS: u32 = 3;
+    for attempt in 1.. {
+        let container = start();
+        let port = container.get_host_port_ipv4(5432).unwrap();
+        let err = match connect_when_ready(&url(port, "postgres", "postgres", "postgres")) {
+            Ok(client) => return (container, port, client),
+            Err(err) => err,
+        };
+        let report = format!(
+            "no connection to the test container on port {port} (attempt {attempt} of {ATTEMPTS}): \
+             {err:?}\n{}",
+            diagnose(&container)
+        );
+        assert!(attempt < ATTEMPTS, "{report}");
+        eprintln!("{report}\nstarting a fresh container");
+    }
+    unreachable!("the loop returns or panics")
+}
+
+/// Retries until the server answers a query. The "ready" log line can come a moment before the
+/// server accepts TCP connections, and Docker's port proxy can accept one before Postgres does.
+fn connect_when_ready(url: &str) -> Result<Client, postgres::Error> {
+    let give_up = env::var("RLSSPEC_TEST_CONNECT_TIMEOUT")
+        .ok()
+        .and_then(|secs| secs.parse().ok())
+        .map_or(Duration::from_secs(30), Duration::from_secs);
     let start = Instant::now();
+    let mut pause = Duration::from_millis(100);
     loop {
-        match Client::connect(url, NoTls) {
-            Ok(client) => return client,
-            Err(e) if start.elapsed() >= GIVE_UP => {
-                panic!("no connection to the test container after {GIVE_UP:?}: {e:?}")
+        let attempt = Client::connect(url, NoTls)
+            .and_then(|mut client| client.batch_execute("SELECT 1").map(|()| client));
+        match attempt {
+            Err(_) if start.elapsed() < give_up => {
+                thread::sleep(pause);
+                pause = (pause * 2).min(Duration::from_secs(1));
             }
-            Err(_) => thread::sleep(Duration::from_millis(250)),
+            done => return done,
         }
     }
+}
+
+fn diagnose(container: &Container<Postgres>) -> String {
+    let log = container.stderr_to_vec().unwrap_or_default();
+    let log = String::from_utf8_lossy(&log);
+    let lines: Vec<&str> = log.lines().collect();
+    format!(
+        "container {}: running = {:?}, exit code = {:?}; end of its log:\n{}",
+        container.id(),
+        container.is_running(),
+        container.exit_code(),
+        lines[lines.len().saturating_sub(15)..].join("\n")
+    )
 }
 
 pub struct Output {
