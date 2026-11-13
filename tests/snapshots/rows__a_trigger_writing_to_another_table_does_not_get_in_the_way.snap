@@ -1,0 +1,9 @@
+---
+source: tests/rows.rs
+expression: "run(\"audited\", 0)"
+---
+notes
+  ✓ alice  update  set body = 'x' · rows: tenant_id = '…000a'  updated 3 rows
+  ✓ alice  delete  rows: tenant_id = '…000a'                   deleted 3 rows
+coverage 2/24 cells (8.3%) · 22 unspecified (ignore)
+0 failed · 2 passed · 0 inconclusive

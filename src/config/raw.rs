@@ -194,17 +194,48 @@ pub enum RawWrites<C> {
     Todo,
     Shorthand(Expectation),
     Cases(Vec<Spanned<C>>),
+    /// One case written as the operation's value, like `select: { rows }`.
+    One(C),
 }
 
-impl<'de, C: Deserialize<'de>> Deserialize<'de> for RawWrites<C> {
+/// A write case, and whether its operation takes one as a mapping instead of a list.
+pub trait RawCase {
+    /// `update` and `delete` do, for the `rows` form. `insert` has no such form.
+    const MAPPING: bool;
+}
+
+impl RawCase for RawInsert {
+    const MAPPING: bool = false;
+}
+
+impl RawCase for RawUpdate {
+    const MAPPING: bool = true;
+}
+
+impl RawCase for RawDelete {
+    const MAPPING: bool = true;
+}
+
+impl<'de, C: Deserialize<'de> + RawCase> Deserialize<'de> for RawWrites<C> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct WritesVisitor<C>(PhantomData<C>);
 
-        impl<'de, C: Deserialize<'de>> Visitor<'de> for WritesVisitor<C> {
+        impl<'de, C: Deserialize<'de> + RawCase> Visitor<'de> for WritesVisitor<C> {
             type Value = RawWrites<C>;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("`allow`, `deny`, `todo` or a list of cases")
+                f.write_str(if C::MAPPING {
+                    "`allow`, `deny`, `todo`, a list of cases or a mapping with `rows`"
+                } else {
+                    "`allow`, `deny`, `todo` or a list of cases"
+                })
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<RawWrites<C>, A::Error> {
+                if !C::MAPPING {
+                    return Err(de::Error::invalid_type(de::Unexpected::Map, &self));
+                }
+                C::deserialize(MapAccessDeserializer::new(map)).map(RawWrites::One)
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<RawWrites<C>, E> {
@@ -236,15 +267,52 @@ pub struct RawInsert {
 #[serde(deny_unknown_fields)]
 pub struct RawUpdate {
     #[serde(rename = "where")]
-    pub predicate: Spanned<String>,
+    pub predicate: Option<Spanned<String>>,
+    pub expect: Option<Spanned<Expectation>>,
+    pub rows: Option<Spanned<String>>,
+    pub subset: Option<Spanned<bool>>,
     pub set: Option<Spanned<SpannedMap<Value>>>,
-    pub expect: Expectation,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RawDelete {
     #[serde(rename = "where")]
-    pub predicate: Spanned<String>,
-    pub expect: Expectation,
+    pub predicate: Option<Spanned<String>>,
+    pub expect: Option<Spanned<Expectation>>,
+    pub rows: Option<Spanned<String>>,
+    pub subset: Option<Spanned<bool>>,
+}
+
+/// Which rows an update or delete case is about: `where` with `expect`, or `rows` with `subset`.
+/// Which keys go together is checked when the config is resolved.
+#[derive(Debug)]
+pub struct RawTarget {
+    pub predicate: Option<Spanned<String>>,
+    pub expect: Option<Spanned<Expectation>>,
+    pub rows: Option<Spanned<String>>,
+    pub subset: Option<Spanned<bool>>,
+}
+
+impl RawUpdate {
+    pub fn split(self) -> (RawTarget, Option<Spanned<SpannedMap<Value>>>) {
+        let target = RawTarget {
+            predicate: self.predicate,
+            expect: self.expect,
+            rows: self.rows,
+            subset: self.subset,
+        };
+        (target, self.set)
+    }
+}
+
+impl From<RawDelete> for RawTarget {
+    fn from(raw: RawDelete) -> Self {
+        Self {
+            predicate: raw.predicate,
+            expect: raw.expect,
+            rows: raw.rows,
+            subset: raw.subset,
+        }
+    }
 }

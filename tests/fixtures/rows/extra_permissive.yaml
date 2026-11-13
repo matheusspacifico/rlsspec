@@ -1,0 +1,21 @@
+# The `where … → deny` cases read a column, so the SELECT policy hides the other tenant and they pass. The `rows` cases read none and see what the extra policies let through.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql, tenant_write.sql, extra_permissive.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+  alice: 00000000-0000-4000-8000-0000000a11ce
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice}" } }
+  guest: { role: web_anon }
+unspecified: ignore
+expect:
+  notes:
+    alice:
+      update:
+        - { where: "tenant_id = ${tenant_b}", set: { body: "x" }, expect: deny }
+        - { set: { body: "x" }, rows: "tenant_id = ${tenant_a}" }
+      delete:
+        - { where: "tenant_id = ${tenant_b}", expect: deny }
+        - { rows: "tenant_id = ${tenant_a}" }

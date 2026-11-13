@@ -6,11 +6,11 @@ use serde_saphyr::Spanned;
 use super::map::SpannedMap;
 use super::raw::{
     RawConfig, RawDatabase, RawIdentity, RawIgnore, RawLint, RawOps, RawSafety, RawSelect,
-    RawWrites, Value,
+    RawTarget, RawWrites, Value,
 };
 use super::vars::{self, Mode, Reference};
 use super::{
-    Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
+    Affects, Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
     DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Exclude, Expectation, Extensions,
     Guc, Identity, Ignore, InsertCase, Lint, OnEmpty, Ops, Safety, Select, SelectCase, Span, Spec,
     TableRef, UpdateCase, Writes,
@@ -473,25 +473,34 @@ impl Resolver<'_> {
         let ops = Ops {
             select: raw.select.map(|select| self.select(select)),
             insert: raw.insert.map(|writes| {
-                self.writes(writes, |r, case| InsertCase {
-                    values: r.assignments(&case.value.values, "values"),
-                    expect: case.value.expect,
-                    span: span(&case),
+                self.writes(writes, |r, case, at, _| InsertCase {
+                    values: r.assignments(&case.values, "values"),
+                    expect: case.expect,
+                    span: at,
                 })
             }),
             update: raw.update.map(|writes| {
-                self.writes(writes, |r, case| UpdateCase {
-                    predicate: r.predicate(&case.value.predicate),
-                    set: case.value.set.as_ref().map(|set| r.assignments(set, "set")),
-                    expect: case.value.expect,
-                    span: span(&case),
+                self.writes(writes, |r, case, at, alone| {
+                    let (target, set) = case.split();
+                    let target = r.target(target, at, alone);
+                    if matches!(target, Affects::Rows { .. }) && set.is_none() {
+                        r.error(
+                            at,
+                            "an update `rows` case needs `set`: its statement assigns constants and reads no column, which a `SET c = c` would"
+                                .into(),
+                        );
+                    }
+                    UpdateCase {
+                        target,
+                        set: set.as_ref().map(|set| r.assignments(set, "set")),
+                        span: at,
+                    }
                 })
             }),
             delete: raw.delete.map(|writes| {
-                self.writes(writes, |r, case| DeleteCase {
-                    predicate: r.predicate(&case.value.predicate),
-                    expect: case.value.expect,
-                    span: span(&case),
+                self.writes(writes, |r, case, at, alone| DeleteCase {
+                    target: r.target(case.into(), at, alone),
+                    span: at,
                 })
             }),
         };
@@ -519,10 +528,12 @@ impl Resolver<'_> {
         Spec::Given(SelectCase { select, span: at })
     }
 
+    /// `case` gets the raw case, where it is written, and whether it stands alone as the
+    /// operation's value instead of in a list.
     fn writes<R, C>(
         &mut self,
         raw: Spanned<RawWrites<R>>,
-        mut case: impl FnMut(&mut Self, Spanned<R>) -> C,
+        mut case: impl FnMut(&mut Self, R, Span, bool) -> C,
     ) -> Spec<Writes<C>> {
         let at = span(&raw);
         let writes = match raw.value {
@@ -532,10 +543,68 @@ impl Resolver<'_> {
                 if cases.is_empty() {
                     self.error(at, "list of cases is empty".into());
                 }
-                Writes::Cases(cases.into_iter().map(|c| case(self, c)).collect())
+                let cases = cases.into_iter().map(|c| {
+                    let at = span(&c);
+                    case(self, c.value, at, false)
+                });
+                Writes::Cases(cases.collect())
             }
+            RawWrites::One(one) => Writes::Cases(vec![case(self, one, at, true)]),
         };
         Spec::Given(writes)
+    }
+
+    /// `where` + `expect`, or `rows` (+ `subset`). `alone`: the case is the operation's value,
+    /// which only the `rows` form may be.
+    fn target(&mut self, raw: RawTarget, at: Span, alone: bool) -> Affects {
+        if let Some(rows) = &raw.rows {
+            for (key, given) in [
+                ("where", raw.predicate.as_ref().map(span)),
+                ("expect", raw.expect.as_ref().map(span)),
+            ] {
+                if let Some(given) = given {
+                    self.error(
+                        given,
+                        format!(
+                            "`rows` cannot be combined with `{key}`: a `rows` case compares the rows the statement affects, a `where` case expects `allow` or `deny`"
+                        ),
+                    );
+                }
+            }
+            return Affects::Rows {
+                predicate: self.predicate(rows),
+                subset: raw.subset.is_some_and(|subset| subset.value),
+            };
+        }
+        if let Some(subset) = &raw.subset {
+            self.error(span(subset), "`subset` is only allowed with `rows`".into());
+        }
+        if alone {
+            self.error(
+                at,
+                "a case written as a mapping must use `rows`; write `where` cases as a list".into(),
+            );
+        }
+        let predicate = match &raw.predicate {
+            Some(predicate) => self.predicate(predicate),
+            None => {
+                self.error(at, "a case needs `where` with `expect`, or `rows`".into());
+                String::new()
+            }
+        };
+        let expect = match (&raw.expect, &raw.predicate) {
+            (Some(expect), _) => expect.value,
+            (None, Some(_)) => {
+                self.error(
+                    at,
+                    "a `where` case needs `expect: allow` or `expect: deny`".into(),
+                );
+                Expectation::Deny
+            }
+            // Already reported: the case has neither `where` nor `rows`.
+            (None, None) => Expectation::Deny,
+        };
+        Affects::Where { predicate, expect }
     }
 
     fn predicate(&mut self, raw: &Spanned<String>) -> String {

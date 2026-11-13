@@ -225,17 +225,40 @@ pub struct InsertCase {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateCase {
-    pub predicate: String,
+    pub target: Affects,
+    /// Always given for a `rows` case: its statement must assign constants only.
     pub set: Option<Assignments>,
-    pub expect: Expectation,
     pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeleteCase {
-    pub predicate: String,
-    pub expect: Expectation,
+    pub target: Affects,
     pub span: Span,
+}
+
+/// What an update or delete case checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Affects {
+    /// `where` + `expect`: the statement, filtered by the predicate, affects all of the matching
+    /// rows (`allow`) or none (`deny`).
+    Where {
+        predicate: String,
+        expect: Expectation,
+    },
+    /// `rows`: the statement, run over the whole table, affects exactly the rows the predicate
+    /// matches, or with `subset` only such rows.
+    Rows { predicate: String, subset: bool },
+}
+
+impl Affects {
+    /// `allow` or `deny` for a `where` case. A `rows` case expects neither: it compares rows.
+    pub fn expect(&self) -> Option<Expectation> {
+        match self {
+            Affects::Where { expect, .. } => Some(*expect),
+            Affects::Rows { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

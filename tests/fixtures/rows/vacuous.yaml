@@ -1,0 +1,24 @@
+# Cases that cannot fail: a predicate matching no row, an empty table, and with `subset` a predicate matching every row.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql, ../writes/empty.sql, tenant_write.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+  alice: 00000000-0000-4000-8000-0000000a11ce
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice}" } }
+  guest: { role: web_anon }
+unspecified: ignore
+expect:
+  notes:
+    alice:
+      update:
+        - { set: { body: "x" }, rows: "id > 100" }
+        - { set: { body: "x" }, rows: "true", subset: true }
+      delete:
+        - { rows: "id > 100", subset: true }
+        - { rows: "id is not null", subset: true }
+  drafts:
+    alice:
+      delete: { rows: "true" }

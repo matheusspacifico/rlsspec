@@ -1,0 +1,27 @@
+# A permission error about the target means no row was touched: a failure for exact rows, a pass with `subset`. Any other error is inconclusive.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [../writes/schema.sql, tenant_write.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+  tenant_b: 00000000-0000-4000-8000-00000000000b
+  alice: 00000000-0000-4000-8000-0000000a11ce
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}", app.user_id: "${alice}" } }
+  guest: { role: web_anon }
+unspecified: ignore
+expect:
+  notes:
+    guest:
+      update:
+        - { set: { body: "x" }, rows: "published" }
+        - { set: { body: "x" }, rows: "published", subset: true }
+      delete:
+        - { rows: "published" }
+        - { rows: "published", subset: true }
+    alice:
+      update:
+        # WITH CHECK rejects the new rows: the whole statement fails.
+        - { set: { tenant_id: "${tenant_b}" }, rows: "tenant_id = ${tenant_a}" }
+        # NOT NULL: not a permission error.
+        - { set: { body: null }, rows: "tenant_id = ${tenant_a}" }

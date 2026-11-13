@@ -230,16 +230,21 @@ Config {
                         Cases(
                             [
                                 UpdateCase {
-                                    predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                    target: Where {
+                                        predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                        expect: Allow,
+                                    },
                                     set: None,
-                                    expect: Allow,
                                     span: Span {
                                         line: 28,
                                         column: 11,
                                     },
                                 },
                                 UpdateCase {
-                                    predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                    target: Where {
+                                        predicate: "tenant_id = '0191e6a2-0000-7000-8000-00000000000a'",
+                                        expect: Deny,
+                                    },
                                     set: Some(
                                         [
                                             Assignment {
@@ -254,7 +259,6 @@ Config {
                                             },
                                         ],
                                     ),
-                                    expect: Deny,
                                     span: Span {
                                         line: 29,
                                         column: 11,

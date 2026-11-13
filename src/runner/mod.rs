@@ -1,3 +1,4 @@
+mod affected;
 pub mod coverage;
 mod insert_deny;
 pub(crate) mod plan;
@@ -12,7 +13,8 @@ use postgres::Transaction;
 
 use crate::catalog::{self, Catalog, ExcludeError, Table};
 use crate::config::{
-    Block, Config, ConfigError, Diagnostic, Identity, Source, Span, TableRef, Writes,
+    Affects, Assignment, Block, Config, ConfigError, Diagnostic, Identity, Source, Span, TableRef,
+    Writes,
 };
 use crate::identity;
 use crate::pg::{self, PgError, Session, Target};
@@ -395,13 +397,8 @@ impl Cell<'_> {
             Some(Writes::Cases(cases)) => {
                 for case in cases {
                     let set = case.set.as_deref();
-                    let description = write::describe_modify(&case.predicate, set, case.expect);
                     let from = (planned.origin, case.span);
-                    self.case(session, report, Op::Update, from, description, |tx, at| {
-                        let (kind, predicate) =
-                            (Modify::Update(set), Some(case.predicate.as_str()));
-                        write::modify(tx, table, identity, kind, predicate, case.expect, at)
-                    })?;
+                    self.modify(session, report, Op::Update, from, &case.target, set)?;
                 }
             }
             None => {}
@@ -424,25 +421,44 @@ impl Cell<'_> {
             }
             Some(Writes::Cases(cases)) => {
                 for case in cases {
-                    let description = write::describe_modify(&case.predicate, None, case.expect);
                     let from = (planned.origin, case.span);
-                    self.case(session, report, Op::Delete, from, description, |tx, at| {
-                        let predicate = Some(case.predicate.as_str());
-                        write::modify(
-                            tx,
-                            table,
-                            identity,
-                            Modify::Delete,
-                            predicate,
-                            case.expect,
-                            at,
-                        )
-                    })?;
+                    self.modify(session, report, Op::Delete, from, &case.target, None)?;
                 }
             }
             None => {}
         }
         Ok(())
+    }
+
+    /// One update (with its `set`, if any) or delete case, in either form.
+    fn modify(
+        &self,
+        session: &mut Session,
+        report: &mut Report,
+        op: Op,
+        from: Written,
+        target: &Affects,
+        set: Option<&[Assignment]>,
+    ) -> Result<(), RunError> {
+        let (table, identity) = (self.entry.table, self.entry.identity);
+        let kind = match op {
+            Op::Delete => Modify::Delete,
+            _ => Modify::Update(set),
+        };
+        match target {
+            Affects::Where { predicate, expect } => {
+                let description = write::describe_modify(predicate, set, *expect);
+                self.case(session, report, op, from, description, |tx, at| {
+                    write::modify(tx, table, identity, kind, Some(predicate), *expect, at)
+                })
+            }
+            Affects::Rows { predicate, subset } => {
+                let description = affected::describe(predicate, set, *subset);
+                self.case(session, report, op, from, description, |tx, at| {
+                    affected::check(tx, table, identity, kind, predicate, *subset, at)
+                })
+            }
+        }
     }
 }
 
