@@ -43,10 +43,21 @@ pub struct InsertAccess {
     pub permissive_policies: Vec<String>,
 }
 
+/// Why a table can't be taken out of scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExcludeError {
+    /// The name resolves to no table in scope, with the reason.
+    Unknown(String),
+    /// An earlier entry, at this line, already excluded the table.
+    Twice(usize),
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Catalog {
     schemas: Vec<String>,
     tables: Vec<Table>,
+    /// Tables taken out of scope by `database.exclude`, with the line of their entry.
+    excluded: Vec<(Table, usize)>,
 }
 
 const TABLES: &str = "
@@ -121,6 +132,7 @@ pub fn load(tx: &mut Transaction, schemas: &[String]) -> Result<Catalog, postgre
     Ok(Catalog {
         schemas: schemas.to_vec(),
         tables,
+        excluded: Vec::new(),
     })
 }
 
@@ -166,7 +178,37 @@ impl Catalog {
                     columns: Vec::new(),
                 })
                 .collect(),
+            excluded: Vec::new(),
         }
+    }
+
+    /// Takes the table `name` resolves to out of scope. `line` is where the spec excludes it.
+    pub fn exclude(&mut self, name: &str, line: usize) -> Result<(), ExcludeError> {
+        let oid = match self.resolve(name) {
+            Ok(table) => table.oid,
+            Err(message) => {
+                return Err(match self.excluded_at(name) {
+                    Some(first) => ExcludeError::Twice(first),
+                    None => ExcludeError::Unknown(message),
+                });
+            }
+        };
+        if let Some(at) = self.tables.iter().position(|t| t.oid == oid) {
+            self.excluded.push((self.tables.remove(at), line));
+        }
+        Ok(())
+    }
+
+    /// The line of the `database.exclude` entry that took `name` out of scope, if one did.
+    pub fn excluded_at(&self, name: &str) -> Option<usize> {
+        let (schema, table) = match name.split_once('.') {
+            Some((schema, table)) => (Some(schema), table),
+            None => (None, name),
+        };
+        self.excluded
+            .iter()
+            .find(|(t, _)| t.name == table && schema.is_none_or(|s| s == t.schema))
+            .map(|(_, line)| *line)
     }
 
     pub fn tables(&self) -> &[Table] {

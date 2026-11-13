@@ -138,6 +138,51 @@ fn init_scaffolds_the_example_with_every_cell_todo() {
 }
 
 #[test]
+fn init_leaves_excluded_tables_out_and_writes_the_exclusion() {
+    let db = example_db(&[]);
+    let spec = scratch("init_exclude").join("rlsspec.yaml");
+    let spec_arg = spec.to_str().unwrap();
+
+    let out = db.rlsspec(&["init", "-o", spec_arg, "--exclude", "tasks,public.projects"]);
+    assert_eq!(out.code, Some(0), "{}", out.stderr);
+    let text = fs::read_to_string(&spec).unwrap();
+    assert!(
+        text.contains("  schemas: [public]\n  exclude: [tasks, public.projects]\n"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("  tasks:") && !text.contains("  projects:"),
+        "{text}"
+    );
+
+    // The scaffold is a valid spec: the exclusions resolve, and the matrix has the two tables left.
+    let cover = db.rlsspec(&["cover", "-c", spec_arg]);
+    assert_eq!(cover.code, Some(0), "{}", cover.stderr);
+    let tables: Vec<&str> = cover
+        .stdout
+        .lines()
+        .filter_map(|l| l.split_whitespace().next())
+        .filter(|name| TABLES.contains(name))
+        .collect();
+    assert_eq!(tables, ["organizations", "memberships"]);
+
+    for (names, message) in [
+        (
+            "tasks,nope",
+            "error: --exclude: table `nope` not found in schema public\n",
+        ),
+        (
+            "tasks,public.tasks",
+            "error: --exclude: table `public.tasks` is listed twice\n",
+        ),
+    ] {
+        let out = db.rlsspec(&["init", "-o", spec_arg, "--force", "--exclude", names]);
+        assert_eq!(out.code, Some(2));
+        assert_eq!(out.stderr, message);
+    }
+}
+
+#[test]
 fn init_refuses_to_overwrite_without_force() {
     let db = example_db(&[]);
     let spec = scratch("init_force").join("rlsspec.yaml");

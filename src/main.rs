@@ -62,6 +62,9 @@ enum Command {
         /// Schemas whose tables are in scope
         #[arg(long, value_delimiter = ',', default_value = "public")]
         schemas: Vec<String>,
+        /// Tables to leave out of the spec (`name` or `schema.name`), written as `database.exclude`
+        #[arg(long, value_delimiter = ',')]
+        exclude: Vec<String>,
         /// Where to write the spec
         #[arg(short, long, default_value = "rlsspec.yaml")]
         output: PathBuf,
@@ -127,10 +130,11 @@ fn run(cli: &Cli) -> Result<ExitCode> {
         Command::Lint { format } => lint(cli, format),
         Command::Init {
             ref schemas,
+            ref exclude,
             ref output,
             force,
             preset,
-        } => init(cli, schemas, output, force, preset),
+        } => init(cli, schemas, exclude, output, force, preset),
     }
 }
 
@@ -169,6 +173,7 @@ fn lint(cli: &Cli, format: Format) -> Result<ExitCode> {
 fn init(
     cli: &Cli,
     schemas: &[String],
+    exclude: &[String],
     output: &Path,
     force: bool,
     preset: Option<Preset>,
@@ -180,7 +185,7 @@ fn init(
         bail!("`DATABASE_URL` is not set; init reads the database to scaffold the spec from it");
     };
     let target = guard(cli, &url, &[])?;
-    let scaffold = init::introspect(&target, schemas, preset)?;
+    let scaffold = init::introspect(&target, schemas, exclude, preset)?;
     init::write(output, &init::render(&scaffold), force)?;
     println!(
         "wrote {}: {} tables × {} identities, {} cells todo",

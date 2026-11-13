@@ -323,7 +323,7 @@ fn x_keys_are_unknown_below_the_top_level_and_other_unknown_keys_keep_their_erro
     );
     assert!(
         nested.starts_with(
-            "error: unknown field `x-note`, expected one of url, schemas\n --> rlsspec.yaml:2:43\n"
+            "error: unknown field `x-note`, expected one of url, schemas, exclude\n --> rlsspec.yaml:2:43\n"
         ),
         "{nested}"
     );
@@ -353,4 +353,33 @@ fn many_aliases_of_one_anchor_are_accepted() {
         yaml.push_str(&format!("  t{i}:\n    alice: *deny\n"));
     }
     assert_eq!(parse(&yaml).unwrap().expect.len(), 150);
+}
+
+#[test]
+fn database_exclude_takes_names_not_patterns() {
+    let config = parse(
+        "version: 1\ndatabase: { url: postgres://localhost/db, exclude: [goose_db_version, app.schema_migrations] }\nidentities:\n  a: { role: app }\n",
+    )
+    .unwrap();
+    let excluded: Vec<&str> = config
+        .database
+        .exclude
+        .iter()
+        .map(|e| e.table.as_str())
+        .collect();
+    assert_eq!(excluded, ["goose_db_version", "app.schema_migrations"]);
+
+    let out = errors(
+        "version: 1\ndatabase:\n  url: postgres://localhost/db\n  exclude: [\"audit_*\", \"\"]\nidentities:\n  a: { role: app }\n",
+    );
+    assert!(
+        out.starts_with(
+            "error: `database.exclude` takes table names; patterns are not supported yet, found `audit_*`\n --> rlsspec.yaml:4:13\n"
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("error: table name is empty\n --> rlsspec.yaml:4:24\n"),
+        "{out}"
+    );
 }

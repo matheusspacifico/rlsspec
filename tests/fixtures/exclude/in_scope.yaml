@@ -1,0 +1,10 @@
+# The blanket default reaches the migration tool's table: guest reads it, and lint reports RLS001.
+version: 1
+database:
+  url: "${env:DATABASE_URL}"
+setup: [../writes/schema.sql, bookkeeping.sql]
+identities:
+  guest: { role: web_anon }
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }

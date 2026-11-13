@@ -1,0 +1,10 @@
+---
+source: tests/exclude.rs
+expression: "report(\"test\", \"excluded\", 0)"
+---
+notes
+  ✓ guest  *  deny  4/4 ops
+tags
+  ✓ guest  *  deny  4/4 ops
+coverage 8/8 cells (100.0%) · 0 unspecified (warn)
+0 failed · 8 passed · 0 inconclusive

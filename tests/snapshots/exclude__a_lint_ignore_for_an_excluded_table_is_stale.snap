@@ -1,0 +1,6 @@
+---
+source: tests/exclude.rs
+expression: "report(\"lint\", \"stale_ignore\", 0)"
+---
+! RLS001  tests/fixtures/exclude/stale_ignore.yaml:14  stale ignore: no RLS001 finding matches it; remove it
+0 errors · 1 warning · 0 info · 0 ignored

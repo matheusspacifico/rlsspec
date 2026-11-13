@@ -1,0 +1,11 @@
+# The same spec with the table out of scope: no case, no coverage cell, no table lint rule.
+version: 1
+database:
+  url: "${env:DATABASE_URL}"
+  exclude: [schema_migrations]
+setup: [../writes/schema.sql, bookkeeping.sql]
+identities:
+  guest: { role: web_anon }
+defaults:
+  guest:
+    "*": { select: deny, insert: deny, update: deny, delete: deny }

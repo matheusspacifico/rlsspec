@@ -1,0 +1,8 @@
+---
+source: tests/exclude.rs
+expression: "report(\"cover\", \"excluded\", 0)"
+---
+       guest
+notes  SIUD
+tags   SIUD
+coverage 8/8 cells (100.0%) · 0 unspecified (warn)

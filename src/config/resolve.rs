@@ -11,8 +11,8 @@ use super::raw::{
 use super::vars::{self, Mode, Reference};
 use super::{
     Assignment, Assignments, Block, Claims, Config, DEFAULT_LOCK_TIMEOUT,
-    DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Expectation, Extensions, Guc,
-    Identity, Ignore, InsertCase, Lint, Ops, Safety, Select, SelectCase, Span, Spec, TableRef,
+    DEFAULT_STATEMENT_TIMEOUT, Database, DeleteCase, Diagnostic, Exclude, Expectation, Extensions,
+    Guc, Identity, Ignore, InsertCase, Lint, Ops, Safety, Select, SelectCase, Span, Spec, TableRef,
     UpdateCase, Writes,
 };
 use crate::lint::{Key, Rule};
@@ -200,7 +200,32 @@ impl Resolver<'_> {
                     .collect()
             }
         };
-        Database { url, schemas }
+        let exclude = raw
+            .exclude
+            .into_iter()
+            .map(|entry| {
+                if entry.value.trim().is_empty() {
+                    self.error(span(&entry), "table name is empty".into());
+                } else if entry.value.contains(WILDCARD) {
+                    self.error(
+                        span(&entry),
+                        format!(
+                            "`database.exclude` takes table names; patterns are not supported yet, found `{}`",
+                            entry.value
+                        ),
+                    );
+                }
+                Exclude {
+                    span: span(&entry),
+                    table: entry.value,
+                }
+            })
+            .collect();
+        Database {
+            url,
+            schemas,
+            exclude,
+        }
     }
 
     fn safety(&mut self, raw: RawSafety) -> Safety {

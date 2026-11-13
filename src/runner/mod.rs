@@ -6,7 +6,7 @@ mod write;
 
 use std::path::{Path, PathBuf};
 
-use crate::catalog::{self, Catalog, Table};
+use crate::catalog::{self, Catalog, ExcludeError, Table};
 use crate::config::{
     Block, Config, ConfigError, Diagnostic, Identity, Source, Span, Spec, TableRef, Writes,
 };
@@ -190,9 +190,26 @@ fn in_session<T>(
     let mut client = pg::connect(target)?;
     let mut session = Session::begin(&mut client, &config.safety)?;
     session.run_setup(&config.setup)?;
-    let catalog = catalog::load(session.tx(), &config.database.schemas)?;
+    let mut catalog = catalog::load(session.tx(), &config.database.schemas)?;
 
     let mut diagnostics = Vec::new();
+    for entry in &config.database.exclude {
+        // An exclusion that excludes nothing is a typo or a leftover, like an unknown table in `expect`.
+        if let Err(err) = catalog.exclude(&entry.table, entry.span.line) {
+            let message = match err {
+                ExcludeError::Unknown(reason) => {
+                    format!("{reason}; a `database.exclude` entry must name a table in scope")
+                }
+                ExcludeError::Twice(line) => {
+                    format!("table `{}` is already excluded at line {line}", entry.table)
+                }
+            };
+            diagnostics.push(Diagnostic {
+                span: entry.span,
+                message,
+            });
+        }
+    }
     let tables = resolve_tables(config, &catalog, &mut diagnostics);
     let plan = plan::build(config, &tables, &catalog, &mut diagnostics);
     for entry in &plan {
@@ -409,6 +426,13 @@ fn resolve_tables<'c>(
         TableRef::Named(name) => match catalog.resolve(name) {
             Ok(table) => Some(table),
             Err(message) => {
+                // Dropping the entry silently would turn written expectations into nothing.
+                let message = match catalog.excluded_at(name) {
+                    Some(line) => format!(
+                        "table `{name}` is excluded by `database.exclude` at line {line}, so nothing written for it would run; remove this entry or the exclusion"
+                    ),
+                    None => message,
+                };
                 diagnostics.push(Diagnostic {
                     span: block.table_span,
                     message,
