@@ -3,8 +3,12 @@ source: tests/on_empty.rs
 expression: out
 ---
 drafts
-  ? guest  *  deny         1/4 ops · select: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:20) · update: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:48) · delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:62)
-  ? alice  *  delete deny  0/1 ops · delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:13:20)
+  ? guest  *  deny         1/4 ops
+      select: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:20)
+      update: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:48)
+      delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:11:62)
+  ? alice  *  delete deny  0/1 ops
+      delete: vacuous: "public"."drafts" has no rows, so this check cannot fail; add rows in setup, or set on_empty: skip on this "*" default (tests/fixtures/on_empty/inconclusive.yaml:13:20)
 notes
   ✓ guest  *  deny         4/4 ops
   ✓ alice  *  delete deny  1/1 ops

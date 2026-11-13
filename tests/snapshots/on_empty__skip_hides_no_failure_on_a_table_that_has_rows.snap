@@ -6,7 +6,9 @@ drafts
   ✓ guest  *  deny  1/1 ops · 3 skipped (empty table)
   ○ alice  *  skipped (empty table)
 notes
-  ✗ guest  *  deny         2/4 ops · select: leaked 6 of the 6 rows it should not see: id=1, id=2, id=3, id=4, id=5, … · update: affected 6 of 6 rows (expected 0)
+  ✗ guest  *  deny         2/4 ops
+      select: leaked 6 of the 6 rows it should not see: id=1, id=2, id=3, id=4, id=5, …
+      update: affected 6 of 6 rows (expected 0)
   ✓ alice  *  delete deny  1/1 ops
 tags
   ✓ guest  *  deny         4/4 ops

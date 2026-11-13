@@ -3,7 +3,9 @@ source: tests/rows.rs
 expression: "run(\"audited_broken\", 2)"
 ---
 notes
-  ? alice  update  set body = 'x' · rows: tenant_id = '…000a'  update as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 6 at SQL statement (tests/fixtures/rows/audited_broken.yaml:17:15)
-  ? alice  delete  rows: tenant_id = '…000a'                   delete as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 4 at SQL statement (tests/fixtures/rows/audited_broken.yaml:18:15)
+  ? alice  update  set body = 'x' · rows: tenant_id = '…000a'
+      update as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 6 at SQL statement (tests/fixtures/rows/audited_broken.yaml:17:15)
+  ? alice  delete  rows: tenant_id = '…000a'
+      delete as `alice` was denied, but not on `notes`: new row violates row-level security policy for table "note_events" (SQLSTATE 42501), from PL/pgSQL function log_note() line 4 at SQL statement (tests/fixtures/rows/audited_broken.yaml:18:15)
 coverage 2/24 cells (8.3%) · 22 unspecified (ignore)
 0 failed · 0 passed · 2 inconclusive

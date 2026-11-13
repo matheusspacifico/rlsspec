@@ -3,11 +3,15 @@ source: tests/rows.rs
 expression: "run(\"errors\", 2)"
 ---
 notes
-  ✗ guest  update  set body = 'x' · rows: published                     did not update 2 of the 2 rows it should update (permission denied for table notes (SQLSTATE 42501))
+  ✗ guest  update  set body = 'x' · rows: published
+      did not update 2 of the 2 rows it should update (permission denied for table notes (SQLSTATE 42501))
   ✓ guest  update  set body = 'x' · rows: published (subset)            permission denied
-  ✗ guest  delete  rows: published                                      did not delete 2 of the 2 rows it should delete (permission denied for table notes (SQLSTATE 42501))
+  ✗ guest  delete  rows: published
+      did not delete 2 of the 2 rows it should delete (permission denied for table notes (SQLSTATE 42501))
   ✓ guest  delete  rows: published (subset)                             permission denied
-  ✗ alice  update  set tenant_id = '…000b' · rows: tenant_id = '…000a'  did not update 3 of the 3 rows it should update (new row violates row-level security policy for table "notes" (SQLSTATE 42501))
-  ? alice  update  set body = NULL · rows: tenant_id = '…000a'          update as `alice` failed: null value in column "body" of relation "notes" violates not-null constraint (SQLSTATE 23502) (tests/fixtures/rows/errors.yaml:27:11)
+  ✗ alice  update  set tenant_id = '…000b' · rows: tenant_id = '…000a'
+      did not update 3 of the 3 rows it should update (new row violates row-level security policy for table "notes" (SQLSTATE 42501))
+  ? alice  update  set body = NULL · rows: tenant_id = '…000a'
+      update as `alice` failed: null value in column "body" of relation "notes" violates not-null constraint (SQLSTATE 23502) (tests/fixtures/rows/errors.yaml:27:11)
 coverage 3/16 cells (18.7%) · 13 unspecified (ignore)
 3 failed · 2 passed · 1 inconclusive

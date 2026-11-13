@@ -5,9 +5,9 @@ expression: "report(\"pass\", 0)"
 labels
   ○ alice  *  skipped (empty table)
 projects
-  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  3/3 ops
+  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a…  3/3 ops
 tasks
-  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a' · rows: tenant_id = '…000a', delete rows: tenant_id = '…000a'  3/3 ops
+  ✓ alice  *  select rows: tenant_id = '…000a', update set tenant_id = '…000a…  3/3 ops
 plans
   ✓ alice  *  select all, update deny, delete deny  3/3 ops
 coverage 9/16 cells (56.2%) · 7 unspecified (warn)

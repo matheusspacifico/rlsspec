@@ -3,8 +3,8 @@ source: tests/writes.rs
 expression: "report(\"insert_pass\", 0)"
 ---
 notes
-  ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce', body = 'mine') → allow   inserted
-  ✓ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce', body = 'theirs') → deny  permission denied
+  ✓ alice  insert  values (id = 7, tenant_id = '…000a', author_id = '…11ce… → allow  inserted
+  ✓ alice  insert  values (id = 8, tenant_id = '…000b', author_id = '…11ce'… → deny  permission denied
 coverage 1/16 cells (6.2%) · 15 unspecified (warn)
 notes
   ○ alice  select, update, delete

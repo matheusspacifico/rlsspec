@@ -7,10 +7,12 @@ drafts
   ○ alice  *  skipped (empty table)
 notes
   ✓ guest  *  deny                        4/4 ops
-  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
+  ? alice  *  update where id < 0 → deny  0/1 ops
+      update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
 tags
   ✓ guest  *  deny                        4/4 ops
-  ? alice  *  update where id < 0 → deny  0/1 ops · update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
+  ? alice  *  update where id < 0 → deny  0/1 ops
+      update: vacuous: the predicate matches no rows, so this check cannot fail (tests/fixtures/on_empty/no_match.yaml:13:21)
 coverage 11/24 cells (45.8%) · 13 unspecified (warn)
 drafts
   ○ alice  select, insert, update, delete
