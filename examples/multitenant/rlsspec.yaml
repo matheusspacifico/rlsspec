@@ -47,18 +47,17 @@ defaults:
     organizations: { select: { rows: "id = ${globex}" }, insert: deny, delete: deny }
     memberships: { update: deny }
 
+# `rows` on update and delete: the statement runs over the whole table and must touch exactly those
+# rows. It reads no column, so the SELECT policies can't hide a write policy that is too wide.
+# Setting org_id to the identity's own organization is a constant that changes nothing on its rows.
 expect:
   organizations:
     ana:
-      update:                                   # admins rename their own organization only
-        - { where: "id = ${acme}", expect: allow }
-        - { where: "id = ${globex}", expect: deny }
+      update: { set: { name: "Acme Inc" }, rows: "id = ${acme}" }   # admins rename their own organization only
     ben:
       update: deny                              # members can't rename it
     cleo:
-      update:
-        - { where: "id = ${globex}", expect: allow }
-        - { where: "id = ${acme}", expect: deny }
+      update: { set: { name: "Globex Inc" }, rows: "id = ${globex}" }
 
   memberships:
     ana:
@@ -88,30 +87,20 @@ expect:
         - { values: { org_id: "${acme}", name: "Hiring" }, expect: allow }
         - { values: { org_id: "${globex}", name: "Hiring" }, expect: deny }
       update:
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
-        - { where: "org_id = ${acme}", set: { org_id: "${globex}" }, expect: deny }
-      delete:
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
+        - { set: { org_id: "${acme}" }, rows: "org_id = ${acme}" }
+        - { where: "org_id = ${acme}", set: { org_id: "${globex}" }, expect: deny }   # nobody moves rows away
+      delete: { rows: "org_id = ${acme}" }
     ben:
       insert:
         - { values: { org_id: "${acme}", name: "Hiring", is_public: true }, expect: allow }
-      update:
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
-      delete:                                   # only admins delete projects
-        - { where: "org_id = ${acme}", expect: deny }
+      update: { set: { org_id: "${acme}" }, rows: "org_id = ${acme}" }
+      delete: deny                              # only admins delete projects
     cleo:
       insert:
         - { values: { org_id: "${globex}", name: "Hiring" }, expect: allow }
         - { values: { org_id: "${acme}", name: "Hiring" }, expect: deny }
-      update:
-        - { where: "org_id = ${globex}", expect: allow }
-        - { where: "org_id = ${acme}", expect: deny }
-      delete:
-        - { where: "org_id = ${globex}", expect: allow }
-        - { where: "org_id = ${acme}", expect: deny }
+      update: { set: { org_id: "${globex}" }, rows: "org_id = ${globex}" }
+      delete: { rows: "org_id = ${globex}" }
 
   tasks:
     ana:
@@ -120,29 +109,18 @@ expect:
         - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ben}" }, expect: deny }
         - { values: { org_id: "${globex}", project_id: "${globex_launch}", title: "Plan", created_by: "${ana}" }, expect: deny }
       update:
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
+        - { set: { org_id: "${acme}" }, rows: "org_id = ${acme}" }
         - { where: "org_id = ${acme}", set: { org_id: "${globex}" }, expect: deny }
-      delete:                                   # admins delete any task of their organization
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
+      delete: { rows: "org_id = ${acme}" }      # admins delete any task of their organization
     ben:
       insert:
         - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ben}" }, expect: allow }
         - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${ana}" }, expect: deny }
-      update:
-        - { where: "org_id = ${acme}", expect: allow }
-        - { where: "org_id = ${globex}", expect: deny }
-      delete:                                   # members delete only their own tasks
-        - { where: "created_by = ${ben}", expect: allow }
-        - { where: "org_id = ${acme} and created_by <> ${ben}", expect: deny }
+      update: { set: { org_id: "${acme}" }, rows: "org_id = ${acme}" }
+      delete: { rows: "created_by = ${ben}" }   # members delete only their own tasks
     cleo:
       insert:
         - { values: { org_id: "${globex}", project_id: "${globex_launch}", title: "Plan", created_by: "${cleo}" }, expect: allow }
         - { values: { org_id: "${acme}", project_id: "${acme_roadmap}", title: "Plan", created_by: "${cleo}" }, expect: deny }
-      update:
-        - { where: "org_id = ${globex}", expect: allow }
-        - { where: "org_id = ${acme}", expect: deny }
-      delete:
-        - { where: "org_id = ${globex}", expect: allow }
-        - { where: "org_id = ${acme}", expect: deny }
+      update: { set: { org_id: "${globex}" }, rows: "org_id = ${globex}" }
+      delete: { rows: "org_id = ${globex}" }

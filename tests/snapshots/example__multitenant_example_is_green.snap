@@ -4,13 +4,11 @@ expression: "run(&db, 0)"
 ---
 organizations
   ✓ ana   *       select rows: id = '…ac3e', insert deny, delete deny  3/3 ops
-  ✓ ana   update  where id = '…ac3e' → allow                           affected 1 of 1 rows
-  ✓ ana   update  where id = '…10be' → deny                            affected 0 of 1 rows
+  ✓ ana   update  set name = 'Acme Inc' · rows: id = '…ac3e'           updated 1 row
   ✓ ben   *       select rows: id = '…ac3e', insert deny, delete deny  3/3 ops
   ✓ ben   update  deny                                                 affected 0 of 2 rows
   ✓ cleo  *       select rows: id = '…10be', insert deny, delete deny  3/3 ops
-  ✓ cleo  update  where id = '…10be' → allow                           affected 1 of 1 rows
-  ✓ cleo  update  where id = '…ac3e' → deny                            affected 0 of 1 rows
+  ✓ cleo  update  set name = 'Globex Inc' · rows: id = '…10be'         updated 1 row
   ✓ anon  *       deny                                                 4/4 ops
 memberships
   ✓ ana   *       select rows: org_id = '…ac3e', update deny                        2/2 ops
@@ -33,47 +31,36 @@ projects
   ✓ ana   *       select rows: org_id = '…ac3e'                                     1/1 ops
   ✓ ana   insert  values (org_id = '…ac3e', name = 'Hiring') → allow                inserted
   ✓ ana   insert  values (org_id = '…10be', name = 'Hiring') → deny                 permission denied
-  ✓ ana   update  where org_id = '…ac3e' → allow                                    affected 2 of 2 rows
-  ✓ ana   update  where org_id = '…10be' → deny                                     affected 0 of 2 rows
+  ✓ ana   update  set org_id = '…ac3e' · rows: org_id = '…ac3e'                     updated 2 rows
   ✓ ana   update  where org_id = '…ac3e' set org_id = '…10be' → deny                permission denied
-  ✓ ana   delete  where org_id = '…ac3e' → allow                                    affected 2 of 2 rows
-  ✓ ana   delete  where org_id = '…10be' → deny                                     affected 0 of 2 rows
+  ✓ ana   delete  rows: org_id = '…ac3e'                                            deleted 2 rows
   ✓ ben   *       select rows: org_id = '…ac3e'                                     1/1 ops
   ✓ ben   insert  values (org_id = '…ac3e', name = 'Hiring', is_public = … → allow  inserted
-  ✓ ben   update  where org_id = '…ac3e' → allow                                    affected 2 of 2 rows
-  ✓ ben   update  where org_id = '…10be' → deny                                     affected 0 of 2 rows
-  ✓ ben   delete  where org_id = '…ac3e' → deny                                     affected 0 of 2 rows
+  ✓ ben   update  set org_id = '…ac3e' · rows: org_id = '…ac3e'                     updated 2 rows
+  ✓ ben   delete  deny                                                              affected 0 of 4 rows
   ✓ cleo  *       select rows: org_id = '…10be'                                     1/1 ops
   ✓ cleo  insert  values (org_id = '…10be', name = 'Hiring') → allow                inserted
   ✓ cleo  insert  values (org_id = '…ac3e', name = 'Hiring') → deny                 permission denied
-  ✓ cleo  update  where org_id = '…10be' → allow                                    affected 2 of 2 rows
-  ✓ cleo  update  where org_id = '…ac3e' → deny                                     affected 0 of 2 rows
-  ✓ cleo  delete  where org_id = '…10be' → allow                                    affected 2 of 2 rows
-  ✓ cleo  delete  where org_id = '…ac3e' → deny                                     affected 0 of 2 rows
+  ✓ cleo  update  set org_id = '…10be' · rows: org_id = '…10be'                     updated 2 rows
+  ✓ cleo  delete  rows: org_id = '…10be'                                            deleted 2 rows
 tasks
   ✓ ana   *       select rows: org_id = '…ac3e'                                     1/1 ops
   ✓ ana   insert  values (org_id = '…ac3e', project_id = '…0002', title =… → allow  inserted
   ✓ ana   insert  values (org_id = '…ac3e', project_id = '…0002', title = … → deny  permission denied
   ✓ ana   insert  values (org_id = '…10be', project_id = '…0003', title = … → deny  permission denied
-  ✓ ana   update  where org_id = '…ac3e' → allow                                    affected 3 of 3 rows
-  ✓ ana   update  where org_id = '…10be' → deny                                     affected 0 of 2 rows
+  ✓ ana   update  set org_id = '…ac3e' · rows: org_id = '…ac3e'                     updated 3 rows
   ✓ ana   update  where org_id = '…ac3e' set org_id = '…10be' → deny                permission denied
-  ✓ ana   delete  where org_id = '…ac3e' → allow                                    affected 3 of 3 rows
-  ✓ ana   delete  where org_id = '…10be' → deny                                     affected 0 of 2 rows
+  ✓ ana   delete  rows: org_id = '…ac3e'                                            deleted 3 rows
   ✓ ben   *       select rows: org_id = '…ac3e'                                     1/1 ops
   ✓ ben   insert  values (org_id = '…ac3e', project_id = '…0002', title =… → allow  inserted
   ✓ ben   insert  values (org_id = '…ac3e', project_id = '…0002', title = … → deny  permission denied
-  ✓ ben   update  where org_id = '…ac3e' → allow                                    affected 3 of 3 rows
-  ✓ ben   update  where org_id = '…10be' → deny                                     affected 0 of 2 rows
-  ✓ ben   delete  where created_by = '…0b0b' → allow                                affected 1 of 1 rows
-  ✓ ben   delete  where org_id = '…ac3e' and created_by <> '…0b0b' → deny           affected 0 of 2 rows
+  ✓ ben   update  set org_id = '…ac3e' · rows: org_id = '…ac3e'                     updated 3 rows
+  ✓ ben   delete  rows: created_by = '…0b0b'                                        deleted 1 row
   ✓ cleo  *       select rows: org_id = '…10be'                                     1/1 ops
   ✓ cleo  insert  values (org_id = '…10be', project_id = '…0003', title =… → allow  inserted
   ✓ cleo  insert  values (org_id = '…ac3e', project_id = '…0002', title = … → deny  permission denied
-  ✓ cleo  update  where org_id = '…10be' → allow                                    affected 2 of 2 rows
-  ✓ cleo  update  where org_id = '…ac3e' → deny                                     affected 0 of 3 rows
-  ✓ cleo  delete  where org_id = '…10be' → allow                                    affected 2 of 2 rows
-  ✓ cleo  delete  where org_id = '…ac3e' → deny                                     affected 0 of 3 rows
+  ✓ cleo  update  set org_id = '…10be' · rows: org_id = '…10be'                     updated 2 rows
+  ✓ cleo  delete  rows: org_id = '…10be'                                            deleted 2 rows
   ✓ anon  *       deny                                                              4/4 ops
 coverage 64/64 cells (100.0%) · 0 unspecified (warn)
-0 failed · 89 passed · 0 inconclusive
+0 failed · 76 passed · 0 inconclusive
