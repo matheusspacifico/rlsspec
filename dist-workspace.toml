@@ -25,3 +25,7 @@ publish-jobs = ["homebrew", "./publish-docker"]
 github-custom-job-permissions = { "publish-docker" = { packages = "write", contents = "read" } }
 # Checksums to generate for each App
 checksum = "sha256"
+
+# dist 0.33 builds aarch64-apple-darwin on macos-14, a runner GitHub no longer offers.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
