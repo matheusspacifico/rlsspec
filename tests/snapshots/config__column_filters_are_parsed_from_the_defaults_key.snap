@@ -1,0 +1,35 @@
+---
+source: tests/config.rs
+expression: "errors(r#\"version: 1\ndatabase: { url: postgres://localhost/db }\nidentities:\n  alice: { role: app }\ndefaults:\n  alice:\n    \"*[]\": { select: deny }\n    \"*[a,,b]\": { select: deny }\n    \"*_log\": { select: deny }\n    \"*[a\": { select: deny }\nexpect:\n  \"*[tenant_id]\":\n    alice: { select: deny }\n\"#)"
+---
+error: `*[]` needs column names between the brackets, like `"*[tenant_id]"`
+ --> rlsspec.yaml:7:5
+  |
+7 |     "*[]": { select: deny }
+  |     ^
+
+error: `*[a,,b]` needs column names between the brackets, like `"*[tenant_id]"`
+ --> rlsspec.yaml:8:5
+  |
+8 |     "*[a,,b]": { select: deny }
+  |     ^
+
+error: expected `"*"` or `"*[column, …]"`, found `*_log`; table name patterns are not supported yet
+ --> rlsspec.yaml:9:5
+  |
+9 |     "*_log": { select: deny }
+  |     ^
+
+error: expected `"*"` or `"*[column, …]"`, found `*[a`; table name patterns are not supported yet
+  --> rlsspec.yaml:10:5
+   |
+10 |     "*[a": { select: deny }
+   |     ^
+
+error: `*` is only allowed under `defaults`
+  --> rlsspec.yaml:12:3
+   |
+12 |   "*[tenant_id]":
+   |   ^
+
+error: could not load rlsspec.yaml (5 errors)

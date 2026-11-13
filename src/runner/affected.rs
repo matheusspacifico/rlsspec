@@ -70,7 +70,7 @@ pub fn check(
     let should: Vec<&Row> = before.iter().filter(|r| r.expected).collect();
     let should_not = before.len() - should.len();
     if before.is_empty() {
-        return Ok(Outcome::Inconclusive(empty_table(table, at, false)));
+        return Ok(Outcome::Inconclusive(empty_table(table, at, None)));
     }
     if should.is_empty() {
         return Ok(Outcome::Inconclusive(no_match(at)));

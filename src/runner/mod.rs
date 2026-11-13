@@ -39,7 +39,7 @@ impl From<postgres::Error> for RunError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
     Select,
     Insert,
@@ -322,10 +322,11 @@ impl Cell<'_> {
     /// A vacuous case that a wildcard default put on an empty table says how to skip it.
     fn hinted(&self, op: Op, outcome: Outcome, at: Location) -> Outcome {
         match outcome {
-            Outcome::Inconclusive(text)
-                if text.starts_with(VACUOUS) && self.entry.hints_on_empty(op) =>
-            {
-                Outcome::Inconclusive(empty_table(self.entry.table, at, true))
+            Outcome::Inconclusive(text) if text.starts_with(VACUOUS) => {
+                Outcome::Inconclusive(match self.entry.empty_under(op) {
+                    Some(wildcard) => empty_table(self.entry.table, at, Some(wildcard)),
+                    None => text,
+                })
             }
             other => other,
         }
@@ -465,13 +466,14 @@ impl Cell<'_> {
 /// How every message of a case that cannot fail starts (hard rule 2).
 const VACUOUS: &str = "vacuous: ";
 
-/// A case over a table with no rows. `wildcard`: it was expanded from a wildcard default, which
-/// can say `on_empty: skip`.
-fn empty_table(table: &Table, at: Location, wildcard: bool) -> String {
-    let way_out = if wildcard {
-        "add rows in setup, or set on_empty: skip on this \"*\" default"
-    } else {
-        "add rows in setup"
+/// A case over a table with no rows. `wildcard`: the key of the wildcard default it was expanded
+/// from, which can say `on_empty: skip`.
+fn empty_table(table: &Table, at: Location, wildcard: Option<&TableRef>) -> String {
+    let way_out = match wildcard {
+        Some(key) => {
+            format!("add rows in setup, or set on_empty: skip on this \"{key}\" default")
+        }
+        None => "add rows in setup".to_owned(),
     };
     format!(
         "{VACUOUS}{} has no rows, so this check cannot fail; {way_out} ({at})",
@@ -557,7 +559,7 @@ fn resolve_tables<'c>(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Vec<Option<&'c Table>> {
     let mut resolve = |block: &Block| match &block.table {
-        TableRef::All => None,
+        TableRef::All | TableRef::Having(_) => None,
         TableRef::Named(name) => match catalog.resolve(name) {
             Ok(table) => Some(table),
             Err(message) => {

@@ -1,0 +1,14 @@
+---
+source: tests/filter.rs
+expression: "report(\"precedence\", 0)"
+---
+projects
+  ✓ alice  select  rows: name = 'apollo'  1 visible
+tasks
+  ✓ alice  *  select rows: project_id = 1, delete rows: tenant_id = '…000a'  2/2 ops
+labels
+  ○ alice  *  skipped (empty table)
+plans
+  ✓ alice  *  select all  1/1 ops
+coverage 4/16 cells (25.0%) · 12 unspecified (ignore)
+0 failed · 4 passed · 0 inconclusive · 1 skipped

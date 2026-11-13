@@ -70,19 +70,15 @@ pub fn resolve(
     for (identity, tables) in raw.defaults {
         r.check_identity(&identity, &known);
         for (table, ops) in tables {
-            let table_ref = if table.value == WILDCARD {
-                TableRef::All
-            } else {
-                TableRef::Named(table.value.clone())
-            };
             let at = span(&table);
+            let table_ref = r.default_table(&table.value, at);
             defaults.push(r.block(table_ref, at, &identity.value, ops, at));
         }
     }
 
     let mut expect = Vec::new();
     for (table, by_identity) in raw.expect {
-        if table.value == WILDCARD {
+        if table.value.trim_start().starts_with(WILDCARD) {
             r.error(span(&table), "`*` is only allowed under `defaults`".into());
         }
         for (identity, ops) in by_identity {
@@ -338,6 +334,33 @@ impl Resolver<'_> {
         Ok(())
     }
 
+    /// A `defaults` key: `*`, `*[column, …]` or a table name.
+    fn default_table(&mut self, key: &str, at: Span) -> TableRef {
+        let Some(rest) = key.trim().strip_prefix(WILDCARD) else {
+            return TableRef::Named(key.to_owned());
+        };
+        if rest.is_empty() {
+            return TableRef::All;
+        }
+        let Some(list) = rest.strip_prefix('[').and_then(|r| r.strip_suffix(']')) else {
+            self.error(
+                at,
+                format!(
+                    "expected `\"*\"` or `\"*[column, …]\"`, found `{key}`; table name patterns are not supported yet"
+                ),
+            );
+            return TableRef::All;
+        };
+        let columns: Vec<String> = list.split(',').map(|c| c.trim().to_owned()).collect();
+        if columns.iter().any(String::is_empty) {
+            self.error(
+                at,
+                format!("`{key}` needs column names between the brackets, like `\"*[tenant_id]\"`"),
+            );
+        }
+        TableRef::Having(columns)
+    }
+
     fn check_identity(&mut self, identity: &Spanned<String>, known: &HashSet<String>) {
         if !known.contains(&identity.value) {
             self.error(
@@ -450,10 +473,10 @@ impl Resolver<'_> {
             );
         }
         let on_empty = match &raw.on_empty {
-            Some(value) if table != TableRef::All => {
+            Some(value) if !table.is_wildcard() => {
                 self.error(
                     span(value),
-                    "`on_empty` is only allowed on a `\"*\"` default; this table is named on purpose, so add rows in `setup` or write `todo`"
+                    "`on_empty` is only allowed on a `\"*\"` or `\"*[column]\"` default; this table is named on purpose, so add rows in `setup` or write `todo`"
                         .into(),
                 );
                 OnEmpty::default()

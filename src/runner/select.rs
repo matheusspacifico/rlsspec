@@ -53,7 +53,7 @@ pub fn check(
     let expected = rows.iter().filter(|r| r.expected).count();
     match select {
         Select::Deny | Select::All if rows.is_empty() => {
-            return Ok(Outcome::Inconclusive(empty_table(table, at, false)));
+            return Ok(Outcome::Inconclusive(empty_table(table, at, None)));
         }
         Select::Rows { .. } if expected == 0 => {
             return Ok(Outcome::Inconclusive(no_match(at)));

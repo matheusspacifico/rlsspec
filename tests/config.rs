@@ -518,3 +518,52 @@ expect:
         "{out}"
     );
 }
+
+#[test]
+fn column_filters_are_parsed_from_the_defaults_key() {
+    let config = parse(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*": { select: deny }
+    "*[tenant_id]": { select: all, on_empty: skip }
+    "*[ org_id , deleted_at ]": { delete: deny }
+    notes: { select: all }
+"#,
+    )
+    .unwrap();
+    let tables: Vec<String> = config
+        .defaults
+        .iter()
+        .map(|b| b.table.to_string())
+        .collect();
+    assert_eq!(
+        tables,
+        ["*", "*[tenant_id]", "*[org_id, deleted_at]", "notes"]
+    );
+    assert_eq!(
+        config.defaults[2].table,
+        config::TableRef::Having(vec!["org_id".into(), "deleted_at".into()])
+    );
+    assert_eq!(config.defaults[1].on_empty, config::OnEmpty::Skip);
+
+    insta::assert_snapshot!(errors(
+        r#"version: 1
+database: { url: postgres://localhost/db }
+identities:
+  alice: { role: app }
+defaults:
+  alice:
+    "*[]": { select: deny }
+    "*[a,,b]": { select: deny }
+    "*_log": { select: deny }
+    "*[a": { select: deny }
+expect:
+  "*[tenant_id]":
+    alice: { select: deny }
+"#
+    ));
+}

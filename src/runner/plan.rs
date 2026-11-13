@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::{Op, Origin};
 use crate::catalog::{Catalog, Table};
 use crate::config::{
-    Block, Config, DeleteCase, Diagnostic, Expectation, Identity, InsertCase, OnEmpty, Select,
+    Block, Config, DeleteCase, Diagnostic, Expectation, Identity, InsertCase, OnEmpty, Ops, Select,
     SelectCase, Span, Spec, TableRef, UpdateCase, Writes,
 };
 
@@ -31,7 +31,7 @@ impl<'c, T> Planned<'c, T> {
 
     /// Whether the cases were expanded from a wildcard default rather than written for this table.
     pub fn is_wildcard(&self) -> bool {
-        self.block.table == TableRef::All
+        self.block.table.is_wildcard()
     }
 }
 
@@ -97,10 +97,13 @@ impl Entry<'_> {
                 .is_some_and(|block| block.on_empty == OnEmpty::Skip)
     }
 
-    /// Whether a vacuous case of `op` should point at `on_empty`: it came from a wildcard default
-    /// and the table has no rows.
-    pub fn hints_on_empty(&self, op: Op) -> bool {
-        self.empty && self.asks_about_empty(op)
+    /// The key of the wildcard default whose cases of `op` landed on a table with no rows: a
+    /// vacuous case there should point at `on_empty`.
+    pub fn empty_under(&self, op: Op) -> Option<&TableRef> {
+        let block = self
+            .wildcard(op)
+            .filter(|_| self.empty && op != Op::Insert)?;
+        Some(&block.table)
     }
 
     /// Whether every operation is denied: `select: deny`, and for each write the `deny` shorthand
@@ -137,6 +140,8 @@ impl Entry<'_> {
 enum Rank {
     Expect,
     NamedDefault,
+    /// `*[column, …]`.
+    Filtered,
     Wildcard,
 }
 
@@ -155,6 +160,8 @@ pub fn build<'c>(
     let mut plan = Plan {
         entries: Vec::new(),
         seen: HashMap::new(),
+        filtered: HashMap::new(),
+        overlapping: Vec::new(),
         catalog,
         diagnostics,
     };
@@ -165,7 +172,7 @@ pub fn build<'c>(
         .zip(tables.iter().copied())
         .collect();
     let (expect, defaults) = blocks.split_at(config.expect.len());
-    let named = defaults.iter().filter(|(b, _)| b.table != TableRef::All);
+    let named = defaults.iter().filter(|(b, _)| !b.table.is_wildcard());
     let wildcards = defaults.iter().filter(|(b, _)| b.table == TableRef::All);
 
     for (rank, (block, table)) in expect
@@ -175,6 +182,35 @@ pub fn build<'c>(
     {
         if let (Some(table), Some(identity)) = (table, identities.get(block.identity.as_str())) {
             plan.add(table, identity, block, rank);
+        }
+    }
+    for (block, _) in defaults.iter() {
+        let TableRef::Having(columns) = &block.table else {
+            continue;
+        };
+        let matching: Vec<&Table> = catalog
+            .tables()
+            .iter()
+            .filter(|t| columns.iter().all(|c| t.column(c).is_some()))
+            .collect();
+        if matching.is_empty() {
+            // A renamed column must not silently drop a blanket rule.
+            let what = match columns.as_slice() {
+                [one] => format!("a column `{one}`"),
+                many => format!("the columns `{}`", many.join("`, `")),
+            };
+            plan.diagnostics.push(Diagnostic {
+                span: block.table_span,
+                message: format!(
+                    "`{}` matches no table: no table in scope has {what}",
+                    block.table
+                ),
+            });
+        }
+        if let Some(identity) = identities.get(block.identity.as_str()) {
+            for table in matching {
+                plan.add(table, identity, block, Rank::Filtered);
+            }
         }
     }
     for (block, _) in wildcards {
@@ -187,17 +223,73 @@ pub fn build<'c>(
     plan.entries
 }
 
+fn defined(ops: &Ops) -> Vec<Op> {
+    let given = [
+        ops.select.is_some(),
+        ops.insert.is_some(),
+        ops.update.is_some(),
+        ops.delete.is_some(),
+    ];
+    Op::ALL
+        .into_iter()
+        .zip(given)
+        .filter(|(_, given)| *given)
+        .map(|(op, _)| op)
+        .collect()
+}
+
 struct Plan<'c, 'd> {
     entries: Vec<Entry<'c>>,
     seen: HashMap<(u32, &'c str, Rank), Span>,
+    /// The `*[…]` default that gave each table × identity × operation its cases.
+    filtered: HashMap<(u32, &'c str, Op), &'c Block>,
+    /// Pairs of `*[…]` defaults already reported as overlapping, by their lines.
+    overlapping: Vec<(usize, usize)>,
     catalog: &'c Catalog,
     diagnostics: &'d mut Vec<Diagnostic>,
 }
 
 impl<'c> Plan<'c, '_> {
+    /// Two `*[…]` defaults of one identity that match the same table and define the same
+    /// operation: there is no rule saying which one wins, so it is an error. Reported once per
+    /// pair of blocks, with the first table they meet on.
+    fn overlaps(&mut self, table: &'c Table, identity: &'c Identity, block: &'c Block) -> bool {
+        let mut clash = false;
+        for op in defined(&block.ops) {
+            let key = (table.oid, identity.name.as_str(), op);
+            let Some(first) = self.filtered.get(&key).copied() else {
+                self.filtered.insert(key, block);
+                continue;
+            };
+            clash = true;
+            let pair = (first.table_span.line, block.table_span.line);
+            if self.overlapping.contains(&pair) {
+                continue;
+            }
+            self.overlapping.push(pair);
+            self.diagnostics.push(Diagnostic {
+                span: block.table_span,
+                message: format!(
+                    "`{}` and `{}` (line {}) both match table {} and define `{}` for `{}`; give that table its own default, or make the two filters disjoint",
+                    block.table,
+                    first.table,
+                    first.table_span.line,
+                    self.catalog.display_name(table),
+                    op.as_str(),
+                    identity.name
+                ),
+            });
+        }
+        clash
+    }
+
     fn add(&mut self, table: &'c Table, identity: &'c Identity, block: &'c Block, rank: Rank) {
         let key = (table.oid, identity.name.as_str(), rank);
-        if rank != Rank::Wildcard {
+        if rank == Rank::Filtered {
+            if self.overlaps(table, identity, block) {
+                return;
+            }
+        } else if rank != Rank::Wildcard {
             if let Some(first) = self.seen.get(&key) {
                 self.diagnostics.push(Diagnostic {
                     span: block.table_span,
@@ -235,7 +327,7 @@ impl<'c> Plan<'c, '_> {
         };
         let origin = match rank {
             Rank::Expect => Origin::Expect,
-            Rank::NamedDefault | Rank::Wildcard => Origin::Default,
+            Rank::NamedDefault | Rank::Filtered | Rank::Wildcard => Origin::Default,
         };
         // Blocks arrive from the most to the least specific, so the first to define an op wins.
         fn planned<'c, T>(

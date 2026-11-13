@@ -1,0 +1,16 @@
+# What a filter can get wrong at run time: it matches no table, or two filters give the same table the same operation.
+version: 1
+database: { url: "${env:DATABASE_URL}" }
+setup: [schema.sql]
+vars:
+  tenant_a: 00000000-0000-4000-8000-00000000000a
+identities:
+  alice: { role: app, gucs: { app.tenant_id: "${tenant_a}" } }
+unspecified: ignore
+defaults:
+  alice:
+    "*[tenant_id]": { select: { rows: "tenant_id = ${tenant_a}" }, delete: deny }
+    "*[org_id]": { select: deny }
+    "*[tenant_id, colour]": { select: deny }
+    "*[project_id]": { select: all, update: deny }
+    "*[title]": { update: deny }
